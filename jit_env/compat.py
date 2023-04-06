@@ -63,3 +63,7 @@ def make_deepmind_wrapper() -> None | tuple[Callable, type]:
             pass
 
     return specs_to_dm_specs, ToDeepmindEnv
+
+
+def make_gymnasium_wrapper() -> None | tuple[Callable, type]:
+    pass  # TODO
