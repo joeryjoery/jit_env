@@ -1,0 +1,14 @@
+Metadata-Version: 2.1
+Name: jit-env
+Version: 0.0.0
+Summary: A Jax interface for Reinforcement Learning environments.
+Home-page: UNKNOWN
+Author: Joery A. de Vries
+Author-email: J.A.deVries@tudelft.nl
+License: UNKNOWN
+Keywords: reinforcement-learning python machine learning jax
+Platform: UNKNOWN
+Requires-Python: >=3.7
+
+UNKNOWN
+

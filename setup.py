@@ -1,41 +1,38 @@
-from importlib import util
-from setuptools import find_packages
-from setuptools import setup
+import os
+from setuptools import setup, find_packages
 
 
-def get_version():
-    spec = util.spec_from_file_location('version', 'jit_env/version.py')
-    mod = util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod.__version__
+def _parse_requirements(path: str) -> list[str]:
+    """Returns content of given requirements file."""
+    with open(os.path.join(path)) as file:
+        lst = [line.rstrip() for line in file
+               if not (line.isspace() or line.startswith("#"))]
+    return lst
+
+
+_pwd = os.path.dirname(os.path.abspath(__file__))
+_req = _parse_requirements(os.path.join(
+    _pwd, './', 'requirements.txt'))
+
+_d = {}
+with open('jit_env/version.py') as f:
+    exec(f.read(), _d)
+
+try:
+    __version__ = _d['__version__']
+except KeyError as e:
+    raise RuntimeError('Module versioning not found!') from e
 
 
 setup(
     name='jit_env',
-    version=get_version(),
+    version=__version__,
     description='A Jax interface for Reinforcement Learning environments.',
-    author='Joery de Vries',
-    keywords='reinforcement-learning python machine learning',
+    author='Joery A. de Vries',
+    author_email="J.A.deVries@tudelft.nl",
+    keywords='reinforcement-learning python machine learning jax',
     packages=find_packages(exclude=['examples']),
     python_requires='>=3.7',
-    install_requires=[
-        'jax',
-    ],
-    tests_require=[
-        'pytest',
-    ],
-    classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'Environment :: Console',
-        'Intended Audience :: Science/Research',
-        'License :: OSI Approved :: Apache Software License',
-        'Operating System :: POSIX :: Linux',
-        'Operating System :: Microsoft :: Windows',
-        'Operating System :: MacOS :: MacOS X',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Topic :: Scientific/Engineering :: Artificial Intelligence',
-    ],
+    install_requires=_req,
+    tests_require=['pytest']
 )
