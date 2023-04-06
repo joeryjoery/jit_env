@@ -1,0 +1,33 @@
+# IDE Data TODO: vs-code data?
+.idea
+
+# Module install specs
+build
+bbox.egg-info
+
+# Jupyter data
+.ipynb_checkpoints
+*/.ipynb_checkpoints
+
+# Logging data
+*/wandb
+*/out
+
+__pycache__
+*/__pycache__
+
+# Type Checker caches
+.mypy_cache
+*/.mypy_cache
+.pytype
+*/.pytype
+
+*mypy_out*
+
+# Unit-Test caches
+.pytest_cache
+*/.pytest_cache
+
+# Local testing/ data folder
+local
+*/local
