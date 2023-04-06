@@ -13,6 +13,7 @@ This is extended with the components:
 - `jit_env.Wrapper`: An interface built on top of Environment that allows modular transformations of the base Environment.
 - `jit_env.Action, jit_env.Observation, jit_env.State`: Explicit types that concern Agent-Environment IO.
 - `jit_env.compat`: A Module containing API hooks to other Agent-Environment interfaces like `dm_env` or `gymnasium`.
+- `jit_env.wrappers`: A Module containing a few generally useful implementations for `Wrapper` (that simultaneously serves as a reference).
 
 Note that this module is only an interface and does not implement any
 Environments itself.
