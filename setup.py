@@ -41,7 +41,12 @@ setup(
     license='MIT',
     python_requires='>=3.7',
     install_requires=_req,
-    extras_require={'dev': ['pytest>=7.1.2', 'twine>=4.0.2', 'wheel>=0.37.1']},
+    extras_require={'dev': [
+        'pytest>=7.1.2',
+        'twine>=4.0.2',
+        'wheel>=0.37.1',
+        'dm_env>=1.5'
+    ]},
     classifiers=[
         'Operating System :: OS Independent',
         'License :: OSI Approved :: MIT License',
