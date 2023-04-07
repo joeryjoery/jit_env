@@ -1,4 +1,21 @@
-"""Implements Wrappers as API hooks to third party libraries"""
+"""Implements Wrappers as API hooks to third party libraries.
+
+Supported third party libraries are:
+ - dm_env
+
+The recommended usage is as follows:
+
+```python
+env = MyJitEnvEnvironment(...)
+
+if out := make_deepmind_wrapper() is None:
+    raise ModuleNotFoundError()
+
+to_dm, spec_converter = out
+
+my_dm_env = to_dm(env)
+```
+"""
 from __future__ import annotations as _annotations
 import typing as _typing
 
@@ -9,6 +26,16 @@ from jit_env import specs as _specs
 
 
 def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
+    """If dm_env can be imported, return an Environment and Spec converter
+
+    If the library can not be loaded, this function suppresses the error.
+
+    Returns:
+        None if dm_env cannot be imported. Otherwise it returns a tuple with;
+        1)  A dm_env.Environment that is initialized with a jit_env.Environment
+            and a jax Pseudo RNG Key.
+        2)  A function that converts jit_env.specs to compatible dm_env.specs.
+    """
     try:
         import dm_env
         from dm_env import specs as dm_specs
@@ -19,6 +46,12 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
         pass  # TODO
 
     class ToDeepmindEnv(dm_env.Environment):
+        """A dm_env.Environment that wraps a jit_env.Environment.
+
+        This Environment class is not functionally pure in the step and
+        reset functions as it requires maintaining a class state for the
+        Environment State and the Random Key.
+        """
 
         def __init__(
                 self,

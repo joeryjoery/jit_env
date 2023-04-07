@@ -1,4 +1,8 @@
-"""Define main module/ API hierarchy"""
+"""Define main module/ API hierarchy.
+
+Private attributes (starting with '_') should not be accessed lest thou would
+risketh the consequences of internal API changes.
+"""
 from typing import Union as _Alias_Union
 from typing_extensions import TypeAlias as _TypeAlias
 

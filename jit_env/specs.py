@@ -1,4 +1,7 @@
-"""Collection of Specification types: indicates data shapes to an Agent
+"""Collection of data-structure Specification Types.
+
+These classes aim to communicate what data-structures are communicated
+between an Agent and the Environment before these structures exist.
 
 Warning: do not import the classes from this module separately! Instead
 import this module as is to prevent confusion with name clashes from e.g.,
