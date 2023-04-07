@@ -23,15 +23,22 @@ try:
 except KeyError as e:
     raise RuntimeError('Module versioning not found!') from e
 
+with open('README.md') as f:
+    long_desc = f.read()
+
 
 setup(
     name='jit_env',
     version=__version__,
     description='A Jax interface for Reinforcement Learning environments.',
+    long_description=long_desc,
+    long_description_content_type='text/markdown',
     author='Joery A. de Vries',
     author_email="J.A.deVries@tudelft.nl",
     keywords='reinforcement-learning python machine learning jax',
-    packages=find_packages(exclude=['examples']),
+    packages=find_packages(where='jit_env'),
+    url='https://github.com/joeryjoery/jit_env',
+    license='MIT',
     python_requires='>=3.7',
     install_requires=_req,
     tests_require=['pytest']
