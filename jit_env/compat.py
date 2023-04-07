@@ -1,46 +1,42 @@
 """Implements Wrappers as API hooks to third party libraries"""
-from __future__ import annotations
-from typing import Callable
+from __future__ import annotations as _annotations
+import typing as _typing
 
-import jax
+import jax as _jax
 
-import jit_env
-from jit_env import specs
+from jit_env import _core
+from jit_env import specs as _specs
 
 
-def make_deepmind_wrapper() -> None | tuple[Callable, type]:
+def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
     try:
         import dm_env
         from dm_env import specs as dm_specs
     except ModuleNotFoundError:
         return None
 
-    def specs_to_dm_specs(spec: specs.Spec) -> dm_specs.Array:
+    def specs_to_dm_specs(spec: _specs.Spec) -> dm_specs.Array:
         pass  # TODO
 
     class ToDeepmindEnv(dm_env.Environment):
 
         def __init__(
                 self,
-                env: jit_env.Environment,
-                rng: jax.random.KeyArray = jax.random.PRNGKey(0),
-                **stage_kwargs
+                env: _core.Environment,
+                rng: _jax.random.KeyArray = _jax.random.PRNGKey(0)
         ):
             self.env = env
             self.rng = rng
 
             self._state = None
 
-            self._reset_fun = jax.jit(env.reset, **stage_kwargs)
-            self._step_fun = jax.jit(env.step, **stage_kwargs)
-
         def reset(self) -> dm_env.TimeStep:
-            self.rng, key = jax.random.split(self.rng)
-            self._state, step = self._reset_fun(key)
+            self.rng, key = _jax.random.split(self.rng)
+            self._state, step = self.env.reset(key)
             return dm_env.restart(step.observation)
 
         def step(self, action) -> dm_env.TimeStep:
-            self._state, step = self._step_fun(self._state, action)
+            self._state, step = self.env.step(self._state, action)
             if step.last():
                 # Discount computation should be handled in `env`.
                 return dm_env.truncation(
@@ -54,16 +50,16 @@ def make_deepmind_wrapper() -> None | tuple[Callable, type]:
             return specs_to_dm_specs(self.env.observation_spec())
 
         def action_spec(self):
-            pass
+            return specs_to_dm_specs(self.env.action_spec())
 
         def reward_spec(self):
-            pass
+            return specs_to_dm_specs(self.env.reward_spec())
 
         def discount_spec(self):
-            pass
+            return specs_to_dm_specs(self.env.discount_spec())
 
-    return specs_to_dm_specs, ToDeepmindEnv
+    return ToDeepmindEnv, specs_to_dm_specs
 
 
-def make_gymnasium_wrapper() -> None | tuple[Callable, type]:
+def make_gymnasium_wrapper() -> None | tuple[_typing.Callable, type]:
     pass  # TODO

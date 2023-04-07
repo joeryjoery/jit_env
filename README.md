@@ -1,6 +1,7 @@
 # `jit_env`: A Jax Compatible RL Environment API
 `jit_env` is a library that aims to adhere closely to the `dm_env` interface
-while allowing for `Jax` transformations inside Environment implementations.
+while allowing for `Jax` transformations inside Environment implementations
+and defining clear type annotations.
 
 Like `dm_env` our API consists of the main components:
 
@@ -49,10 +50,18 @@ or alternatively by checking out a local copy of our repository and running:
 If you are a particularly nice person and this work was useful to you, you can
 cite this repository as:
 ```
-@misc{dm_env2019,
+@misc{jit_env_2023,
   author={Joery A. de Vries},
   title={jit\_env: A Jax interface for reinforcement learning environments},
   year={2023},
   url={http://github.com/joeryjoery/jit_env}
 }
 ```
+
+## References
+This library was heavily inspired by the following libraries:
+- dm-env: [https://github.com/deepmind/dm_env](https://github.com/deepmind/dm_env)
+- jumanji: [https://github.com/instadeepai/jumanji](https://github.com/instadeepai/jumanji)
+- gymnax: [https://github.com/RobertTLange/gymnax](https://github.com/RobertTLange/gymnax)
+
+

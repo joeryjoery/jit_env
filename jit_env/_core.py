@@ -20,6 +20,14 @@ from jit_env import specs
 # Define Environment IO Types.
 
 class StateProtocol(Protocol):
+    """Environment states should always carry a PRNGKey for predictable IO.
+
+    For example, if we were to save states in a replay buffer (for whatever
+    reason) we require all dependent data to be contained in State.
+    This would not be the case if `key` were part of the Environment
+    `step` function, as this could be changed arbitrarily by the caller.
+    In turn, this leads to un-reproducible behaviour.
+    """
     key: jax.random.KeyArray
 
 
@@ -29,11 +37,11 @@ State = TypeVar("State", bound="StateProtocol")
 Action = TypeVar("Action")
 
 
-class StepType(jnp.int8):
+class StepType:
     """Defines the status of a `TimeStep` within a sequence."""
-    FIRST = jnp.array(0, jnp.int8)
-    MID = jnp.array(1, jnp.int8)
-    LAST = jnp.array(2, jnp.int8)
+    FIRST: Int8[Array, ''] = jnp.array(0, jnp.int8)
+    MID: Int8[Array, ''] = jnp.array(1, jnp.int8)
+    LAST: Int8[Array, ''] = jnp.array(2, jnp.int8)
 
 
 @dataclass
@@ -42,7 +50,7 @@ class TimeStep(Generic[Observation]):
     reward: PyTree[Num[Array, '...']]
     discount: PyTree[Num[Array, '...']]
     observation: Observation
-    extras: dict | None = None
+    extras: dict[str, Any] | None = None
 
     def first(self) -> Bool[Array, '']:
         return self.step_type == StepType.FIRST
@@ -56,11 +64,8 @@ class TimeStep(Generic[Observation]):
 
 # Define Environment and Wrapper
 
-class Environment(metaclass=abc.ABCMeta):
-    """Abstract base class for Python RL environments.
-    Observations and valid actions are described with `Array` specs, defined in
-    the `specs` module.
-    """
+class Environment(Generic[State], metaclass=abc.ABCMeta):
+    """Interface for defining Environment logic for RL-Agents. """
 
     def __str__(self) -> str:
         return self.__class__.__name__
@@ -160,13 +165,12 @@ class Environment(metaclass=abc.ABCMeta):
           # Use env.
         ```
         """
-        pass
 
     def render(self, state: State) -> Any:
         """Generate a pixel-observation based on the given state. """
         raise NotImplementedError("Render Function not Implemented")
 
-    def __enter__(self):
+    def __enter__(self) -> Environment:
         """Allows the environment to be used in a with-statement context."""
         return self
 
@@ -176,7 +180,7 @@ class Environment(metaclass=abc.ABCMeta):
         self.close()
 
 
-class Wrapper(Environment, Generic[State], metaclass=abc.ABCMeta):
+class Wrapper(Environment[State], Generic[State], metaclass=abc.ABCMeta):
 
     def __init__(self, env: Environment):
         super().__init__()
@@ -211,6 +215,9 @@ class Wrapper(Environment, Generic[State], metaclass=abc.ABCMeta):
 
     def action_spec(self) -> specs.Spec:
         return self.env.action_spec()
+
+    def render(self, state: State) -> Any:
+        return self.env.render(state)
 
 
 # Define helpers to instantiate TimeStep objects at Environment boundaries

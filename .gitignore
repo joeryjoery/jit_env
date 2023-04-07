@@ -17,6 +17,7 @@ __pycache__
 */__pycache__
 
 # Type Checker caches
+.dmypy.json
 .mypy_cache
 */.mypy_cache
 .pytype
