@@ -1,3 +1,3 @@
 jax
 chex
-jaxtyping
+jaxtyping>=0.2.14

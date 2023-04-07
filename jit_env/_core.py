@@ -105,7 +105,7 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
 
     def __repr__(self) -> str:
         """Returns a complete informative representation of self."""
-        return super().__repr__(self)
+        return super().__repr__()
 
     @property
     def unwrapped(self) -> Environment:
@@ -202,17 +202,16 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
 
         Implement this method for an environment backed by an external process.
 
-        This method can be used directly
-        ```python
-        env = Env(...)
-        # Use env.
-        env.close()
-        ```
-        or via a context manager
-        ```python
-        with Env(...) as env:
-          # Use env.
-        ```
+        This method can be used directly::
+
+            env = Env(...)
+            # Use env.
+            env.close()
+
+        or via a context manager::
+
+            with Env(...) as env:
+              # Use env.
         """
 
     def render(self, state: State) -> Any:

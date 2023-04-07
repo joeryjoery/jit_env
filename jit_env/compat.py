@@ -3,18 +3,13 @@
 Supported third party libraries are:
  - dm_env
 
-The recommended usage is as follows:
+The recommended usage is as follows::
 
-```python
-env = MyJitEnvEnvironment(...)
+    env = MyJitEnvEnvironment(...)
 
-if out := make_deepmind_wrapper() is None:
-    raise ModuleNotFoundError()
-
-to_dm, spec_converter = out
-
-my_dm_env = to_dm(env)
-```
+    if out := make_deepmind_wrapper() is not None:
+        to_dm, spec_converter = out
+        my_dm_env = to_dm(env)
 """
 from __future__ import annotations as _annotations
 import typing as _typing
