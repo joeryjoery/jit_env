@@ -3,6 +3,7 @@
 
 # Module install specs
 build
+dist
 jit_env.egg-info
 
 # Jupyter data
