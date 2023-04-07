@@ -34,7 +34,7 @@ which in turn gives some added flexibility in designing desired
 state-action spaces.
 
 ## Installation
-`jit_env` can be installed with: (FUTURE NOT YET ON PYPI)
+`jit_env` can be installed with:
 
 `python -m pip install jit-env`
 
@@ -64,4 +64,7 @@ This library was heavily inspired by the following libraries:
 - jumanji: [https://github.com/instadeepai/jumanji](https://github.com/instadeepai/jumanji)
 - gymnax: [https://github.com/RobertTLange/gymnax](https://github.com/RobertTLange/gymnax)
 
-
+I developed this module to have a reliable Environment backend that is less subject
+to refactoring changes as these other libraries. The hope is that this library
+will not require much maintenance/ alterations at all (aside from some type-hint updates) 
+after an official 1.0.0 release.
