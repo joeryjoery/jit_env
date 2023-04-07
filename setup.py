@@ -36,10 +36,21 @@ setup(
     author='Joery A. de Vries',
     author_email="J.A.deVries@tudelft.nl",
     keywords='reinforcement-learning python machine learning jax',
-    packages=find_packages(where='jit_env'),
+    packages=find_packages(),
     url='https://github.com/joeryjoery/jit_env',
     license='MIT',
     python_requires='>=3.7',
     install_requires=_req,
-    tests_require=['pytest']
+    extras_require={'dev': ['pytest>=7.1.2', 'twine>=4.0.2', 'wheel>=0.37.1']},
+    classifiers=[
+        'Operating System :: OS Independent',
+        'License :: OSI Approved :: MIT License',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
+        'Programming Language :: Python :: 3.11',
+        'Topic :: Software Development :: Testing :: Mocking',
+        'Topic :: Software Development :: Testing :: Unit'
+    ]
 )
