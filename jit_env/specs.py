@@ -21,6 +21,8 @@ Incorrect usage::
 The basic Spec types defined in this Module were adapted from:
  - Jumanji: https://github.com/instadeepai/jumanji
 
+Our implementation of `validate` and `generate_value` are compatible with
+typical `jax` transformations like `jax.vmap` or `jax.jit`.
 """
 from __future__ import annotations as _annotations
 import abc as _abc
@@ -35,16 +37,23 @@ import jax as _jax
 from jax import numpy as _jnp
 from jax import tree_util as _tree_util
 
-
 _T = _typing.TypeVar("_T")
 
 
-class Spec(_abc.ABC, _typing.Generic[_T]):
+class Spec(_typing.Generic[_T], metaclass=_abc.ABCMeta):
     """Interface for defining datastructure Specifications.
 
     This type is meant to 'Specify' a datastructure's shapes, types, and
     general structure without needing to instantiate said structure.
+
+    We copy the `__slots__` implementation from `dm_env` with read-only
+    properties to enforce that `specs` cannot be modified at runtime.
+
+    Notes
+        Specs are not composable with jax transformations.
     """
+    __slots__ = ('_name',)
+    __hash__ = None
 
     def __init__(self, name: str = ""):
         """Initialize a Spec by requiring an explicit naming.
@@ -52,15 +61,44 @@ class Spec(_abc.ABC, _typing.Generic[_T]):
         Args:
             name: Explicit string name for the datastructure specification.
         """
-        self.name = name
+        self._name = name
 
-    def __str__(self) -> str:
-        """Return a string representation of the full Specification."""
-        return f"{self.__class__.__name__}(name={self.name})"
+    @property
+    def name(self) -> str:
+        return self._name
+
+    def __repr__(self) -> str:
+        """Return a string representation of the full Specification.
+
+        All __slot__ attributes are collected within the Spec's inheritance
+        chain and string concatenated top-to-bottom : left-to-right.
+
+        In other words, this method gives: 'Name(slots_top, slots_lower, ...)'
+        """
+        # iterator over ((slot_self_a, ...), (slot_super_a, ...), ...)
+        slots = (getattr(cls, '__slots__', ()) for cls in type(self).__mro__)
+
+        reverse_ordered, seen = list(), set()
+        for s in slots:
+            if s and (s not in seen):
+                seen.add(s)
+                reverse_ordered += list(s)[::-1]
+
+        slot_values = ','.join(
+            [f'{attr}={getattr(self, attr)}'.lstrip('_')
+             for attr in reverse_ordered[::-1]]
+        )
+
+        return f"{self.__class__.__name__}({slot_values})"
 
     def _fail_validation(self, message: str):
-        """Helper function to distinguish validation between specs."""
-        raise ValueError(message + f' for spec "{self.name}"')
+        """Helper function for creating jax transform-compatible errors."""
+        def _raiser(*_):
+            raise ValueError(message + f' for spec "{self.name}"')
+
+        # ValueError is directly raised outside jax.jit/ jax.vmap/ etc.
+        # Otherwise, it is raised through the XLA dispather.
+        _jax.debug.callback(_raiser)
 
     @_abc.abstractmethod
     def validate(self, value: _T) -> _T:
@@ -75,7 +113,23 @@ class Spec(_abc.ABC, _typing.Generic[_T]):
         """Returns a new copy of `self` with specified attributes replaced """
 
 
-class CompositeSpec(Spec[_T], _typing.Generic[_T], _abc.ABC):
+class PrimitiveSpec(Spec[_T], _typing.Generic[_T], metaclass=_abc.ABCMeta):
+    """Distinguishes `leaf` Spec Types from structured/ composite Specs.
+
+    In other words, these Specs do not build Specs from other Specs.
+    """
+    __slots__ = ('_shape', '_dtype')
+
+    @property
+    def shape(self) -> int | _typing.Sequence[int]:
+        return self._shape
+
+    @property
+    def dtype(self) -> _typing.Any:
+        return self._dtype
+
+
+class CompositeSpec(Spec[_T], _typing.Generic[_T], metaclass=_abc.ABCMeta):
     """Prevent Spec Types that compose other Spec Types from using replace.
 
     Since multiple Specs may be composed with similar namespaces it becomes
@@ -87,6 +141,11 @@ class CompositeSpec(Spec[_T], _typing.Generic[_T], _abc.ABC):
     Instead, it is safer and more clear to modify any particular leaf Specs
     and rebuild the composite Spec using the constructor.
     """
+    __slots__ = ()
+
+    @_abc.abstractmethod
+    def as_spec_struct(self) -> _jxtype.PyTree[PrimitiveSpec]:
+        """Return the tree of primitive Spec types as is."""
 
     def replace(self, **kwargs: _typing.Any) -> Spec:
         """Composite Specs cannot be unambiguously replaced.
@@ -102,8 +161,9 @@ class CompositeSpec(Spec[_T], _typing.Generic[_T], _abc.ABC):
         )
 
 
-class Array(Spec):
+class Array(PrimitiveSpec):
     """Describes a Jax Array Specification."""
+    __slots__ = ()
 
     def __init__(
             self,
@@ -120,27 +180,14 @@ class Array(Spec):
         """
         super().__init__(name)
         self._shape = tuple(shape)
-        self._dtype = dtype
-
-    def __str__(self) -> str:
-        return f"{self.__class__.__name__}(shape={str(self.shape)}, " \
-               f"dtype={str(self.dtype)}, name={str(self.name)})"
-
-    @property
-    def shape(self) -> tuple:
-        """Returns a `tuple` specifying the array shape."""
-        return self._shape
-
-    @property
-    def dtype(self) -> _typing.Any:  # TODO: jax.typing.DTypeLike
-        """Returns a jax numpy dtype specifying the array dtype."""
-        return self._dtype
+        self._dtype = _jnp.zeros((), dtype).dtype  # get uniform `dtype` type
 
     def validate(
             self, 
-            value: _jxtype.Num[_jxtype.Array, '...']
-    ) -> _jxtype.Num[_jxtype.Array, '...']:
+            value: _jxtype.ArrayLike
+    ) -> _jxtype.ArrayLike:
         value = _jnp.asarray(value)
+
         if value.shape != self.shape:
             self._fail_validation(
                 f"Expected shape {self.shape} but found {value.shape}"
@@ -180,7 +227,11 @@ class Array(Spec):
 
 
 class BoundedArray(Array):
-    """A variant of Array that imposes explicit minimum and maximum bounds."""
+    """A variant of Array that imposes explicit minimum and maximum bounds.
+
+    These bounds annotate (not enforced) a l1 Box constraint.
+    """
+    __slots__ = ('_minimum', '_maximum')
 
     def __init__(
         self,
@@ -231,52 +282,59 @@ class BoundedArray(Array):
         self._minimum = minimum
         self._maximum = maximum
 
-    def __str__(self) -> str:
-        return (
-            f"BoundedArray(shape={str(self.shape)}, "
-            f"dtype={str(self.dtype)}, "
-            f"name={str(self.name)}, "
-            f"minimum={str(self.minimum)}, "
-            f"maximum={str(self.maximum)})"
-        )
-
     @property
     def minimum(self) -> _jxtype.Num[_jxtype.Array, '...']:
-        """Returns a Jax array specifying the minimum bounds (inclusive)."""
         return self._minimum
 
     @property
     def maximum(self) -> _jxtype.Num[_jxtype.Array, '...']:
-        """Returns a Jax array specifying the maximum bounds (inclusive)."""
         return self._maximum
 
     def validate(
             self, 
-            value: _jxtype.Num[_jxtype.Array, '...']
-    ) -> _jxtype.Num[_jxtype.Array, '...']:
+            value: _jxtype.ArrayLike
+    ) -> _jxtype.ArrayLike:
+        """Check if value falls inbetween the specified bounds."""
         value = super().validate(value)
-        if (value < self.minimum).any() or (value > self.maximum).any():
-            self._fail_validation(
-                "Values were not all within bounds "
-                f"{self.minimum} <= {value} <= {self.maximum}"
-            )
+
+        _ = _jax.lax.cond(
+            (value < self.minimum).any(),
+            lambda: self._fail_validation(
+                f'Value exceeded minimum: {self.minimum} > {value}'
+            ),
+            lambda: None
+        )
+
+        _ = _jax.lax.cond(
+            (value > self.maximum).any(),
+            lambda: self._fail_validation(
+                f'Value exceeded maximum: {value} > {self.maximum}'
+            ),
+            lambda: None,
+        )
+
         return value
 
     def generate_value(self) -> _jxtype.Num[_jxtype.Array, '...']:
         """Generate a jax array of the minima which conforms to this shape."""
-        return _jnp.ones(shape=self.shape, dtype=self.dtype) * self.minimum
+        return _jnp.full(
+            shape=self.shape, fill_value=self.minimum, dtype=self.dtype
+        )
 
 
 class DiscreteArray(BoundedArray):
-    """A variant of BoundedArray with integer values and a maximum."""
+    """A variant of BoundedArray with strict integer values and minimum=0."""
+    __slots__ = ()
 
     def __init__(
             self, 
-            num_values: int,
+            num_values: int | _typing.Sequence[int] | _jxtype.Integer[
+                _jxtype.Array, '...'  
+            ],
             dtype: _typing.Any = _jnp.int32,  # TODO: jax.typing.DTypeLike
             name: str = ""
     ):
-        """Initializes a new `BoundedArray` spec.
+        """Initializes a new `DiscreteArray` spec.
 
         Args:
             num_values: The number of integers this spec should support.
@@ -288,98 +346,28 @@ class DiscreteArray(BoundedArray):
                 if `num_values` is not positive or the given `dtype` is not a
                 jax-supported integer type.
         """
-        if (not num_values > 0) or (not _jnp.issubdtype(
-                type(num_values), _jnp.integer)):
-            raise ValueError(
-                f"`num_values` must be a positive integer, got {num_values}."
-            )
-
-        if not _jnp.issubdtype(dtype, _jnp.integer):
-            raise ValueError(f"`dtype` must be integer, got {dtype}.")
-
-        num_values = int(num_values)
-        maximum = num_values - 1
-
-        super().__init__((), dtype, minimum=0, maximum=maximum, name=name)
-        self._num_values = num_values
-
-    def __str__(self) -> str:
-        return (
-            f"DiscreteArray(shape={str(self.shape)}, "
-            f"dtype={str(self.dtype)}, "
-            f"name={str(self.name)}, minimum={str(self.minimum)},"
-            f" maximum={str(self.maximum)}, "
-            f"num_values={str(self.num_values)})"
-        )
-
-    @property
-    def num_values(self) -> int:
-        """Returns the number of items."""
-        return self._num_values
-
-
-class MultiDiscreteArray(BoundedArray):
-    """Generalizes DiscreteArray to higher dimensions."""
-
-    def __init__(
-        self,
-        num_values: _typing.Sequence[int] | _jxtype.Integer[
-            _jxtype.Array, '...'],
-        dtype: _typing.Any = _jnp.int32,
-        name: str = ""
-    ):
-        """Initializes a new `BoundedArray` spec.
-
-        Args:
-            num_values:
-                The number of integers this spec should support across
-                distinct action dimensions.
-            dtype:
-                An int-like jax dtype for the array.
-            name:
-                Explicit string name for the array specification.
-
-        Raises:
-            ValueError:
-                if `num_values` are not all positive or the given `dtype`
-                is not a jax-supported integer type.
-        """
         num_values = _jnp.asarray(num_values, dtype)
         if (not (num_values > 0).all()) or (not _jnp.issubdtype(
                 num_values.dtype, _jnp.integer)):
             raise ValueError(
-                f"`num_values` must be an array of positive integers, got {num_values}."
+                f"`num_values` may only contain positive integers, "
+                f"got {num_values}."
             )
 
         if not _jnp.issubdtype(dtype, _jnp.integer):
             raise ValueError(f"`dtype` must be integer, got {dtype}.")
 
-        num_values = num_values
-        maximum = num_values - 1
         super().__init__(
-            shape=num_values.shape,
+            shape=_jnp.shape(num_values),
             dtype=dtype,
-            minimum=_jnp.zeros_like(num_values),
-            maximum=maximum,
-            name=name,
+            minimum=0,
+            maximum=num_values - 1,
+            name=name
         )
-        self._num_values = num_values
 
     @property
     def num_values(self) -> _jxtype.Integer[_jxtype.Array, '...']:
-        """Returns the number of possible values across all dimensions."""
-        return self._num_values
-
-    def __repr__(self) -> str:
-        return (
-            f"MultiDiscreteArray("
-            f"shape={repr(self.shape)}, "
-            f"dtype={repr(self.dtype)}, "
-            f"name={repr(self.name)}, "
-            f"minimum={repr(self.minimum)}, "
-            f"maximum={repr(self.maximum)}, "
-            f"num_values={repr(self.num_values)})"
-        )
+        return self.maximum + 1
 
 
 @_tree_util.register_pytree_node_class
@@ -389,6 +377,7 @@ class Tree(CompositeSpec):
     This Spec is created from other specs by providing the leaf specs and
     a desired PyTree structure.
     """
+    __slots__ = ('_leave_specs', '_treedef')
 
     def __init__(
             self,
@@ -408,8 +397,22 @@ class Tree(CompositeSpec):
                 Explicit string name for the Tree specification.
         """
         super().__init__(name=name)
-        self.leave_specs = leaves
-        self.treedef = structure
+        self._leave_specs = leaves
+        self._treedef = structure
+
+    def __repr__(self) -> str:
+        """Override base `repr` by mapping `repr` over all leave-specs."""
+        leave_strs = _jax.tree_map(repr, self.leave_specs)
+        tree_str = str(_tree_util.tree_unflatten(self.treedef, leave_strs))
+        return f'{self.__class__.__name__}(name={self.name}, tree={tree_str})'
+
+    @property
+    def leave_specs(self) -> _typing.Sequence[Spec]:
+        return self._leave_specs
+
+    @property
+    def treedef(self) -> _tree_util.PyTreeDef:
+        return self._treedef
 
     def tree_flatten(
             self
@@ -426,15 +429,14 @@ class Tree(CompositeSpec):
         """Reinitialize the class from the leaves and the requisite data"""
         return cls(children, *aux)
 
-    @property
-    def spec_struct(self) -> _jxtype.PyTree[Spec]:
+    def as_spec_struct(self) -> _jxtype.PyTree[Spec]:
         """Return the unflattend Spec PyTree as is."""
         return _tree_util.tree_unflatten(self.treedef, self.leave_specs)
 
     def validate(
             self,
-            value: _jxtype.PyTree[_jxtype.Num[_jxtype.Array, '...'] | None]
-    ) -> _jxtype.PyTree[_jxtype.Num[_jxtype.Array, '...'] | None]:
+            value: _jxtype.PyTree[_jxtype.ArrayLike | None]
+    ) -> _jxtype.PyTree[_jxtype.ArrayLike | None]:
         as_leaves = _tree_util.tree_leaves(value)
         leaves = _jax.tree_map(
             lambda v, s: s.validate(v),
@@ -448,14 +450,10 @@ class Tree(CompositeSpec):
         values = [s.generate_value() for s in self.leave_specs]
         return _tree_util.tree_unflatten(self.treedef, values)
 
-    def __str__(self) -> str:
-        leave_strs = _jax.tree_map(str, self.leave_specs)
-        tree_str = str(_tree_util.tree_unflatten(self.treedef, leave_strs))
-        return f'{self.__class__.__name__}(name={self.name}, {tree_str})'
-
 
 class Tuple(Tree):
     """Overrides Tree as a Tuple PyTree Structure."""
+    __slots__ = ()
 
     def __init__(self, *var_specs: Spec, name: str = ""):
         """Initializes a new `Tuple` spec.
@@ -475,6 +473,7 @@ class Tuple(Tree):
 
 class Dict(Tree):
     """Overrides Tree as a Dictionary PyTree Structure."""
+    __slots__ = ()
 
     def __init__(
             self,
@@ -501,7 +500,6 @@ class Dict(Tree):
         if dict_spec is None:
             dict_spec = {}
 
-        self._defaults = {'name': name, 'dict_spec': dict_spec} | kwarg_specs
         full_spec = dict_spec | kwarg_specs
 
         if not full_spec:
@@ -520,6 +518,7 @@ class Batched(CompositeSpec, _typing.Generic[_T]):
     This Spec type essentially wraps the base spec with a call to jax.vmap
     inside `validate` and `generate_value`
     """
+    __slots__ = ('_num', '_spec')
 
     def __init__(self, spec: Spec, num: int, name: str = ""):
         """Initializes a new `Batched` spec.
@@ -536,19 +535,89 @@ class Batched(CompositeSpec, _typing.Generic[_T]):
         if not num > 0:
             raise ValueError("Cannot Batch over empty dimensions! num > 0!")
 
-        self.spec = spec
-        self.num = num
+        self._spec = spec
+        self._num = num
 
-    def __str__(self) -> str:
-        return f'{self.__class__.__name__}(name={self.name}, ' \
-               f'spec={str(self.spec)}, num={self.num})'
+    @property
+    def spec(self) -> Spec:
+        return self._spec
+
+    @property
+    def num(self) -> int:
+        return self._num
+
+    def as_spec_struct(self) -> _jxtype.PyTree[PrimitiveSpec]:
+        """Unpack and prepend batch-size to all leaf-specs.
+
+        Warning, to prevent unnecesarily unpacking nested structures, this
+        method only unpacks CompositeSpec types by one level, and "re-batches"
+        any CompositeSpecs 1 level down.
+
+        To do this recursively, see `unpack_spec`.
+        """
+        base_spec = self.spec
+        if isinstance(base_spec, CompositeSpec):
+            base_spec = base_spec.as_spec_struct()
+
+        def reshape(s: Spec):
+            if isinstance(s, PrimitiveSpec):
+                return reshape_spec(s, prepend=(self.num,))
+            return Batched(s, self.num)
+
+        return _jax.tree_map(reshape, base_spec)
 
     def validate(self, value: _T) -> _T:
-        return _jax.vmap(self.spec.validate)(value)
+        # jax.vmap fails as error-raising is non-homogenous.
+        return _jax.lax.map(self.spec.validate, value)
 
     def generate_value(self) -> _T:
         base_value = self.spec.generate_value()
         return _jax.vmap(lambda x: base_value)(_jnp.arange(self.num))
+
+
+# Utility functions for handling Spec types
+
+def reshape_spec(
+        spec: Spec,
+        prepend: _typing.Sequence[int] = (),
+        append: _typing.Sequence[int] = ()
+) -> Spec:
+    """Utility function to modularly reshape a Spec type.
+
+    This is useful for wrapping Environments with `jax.vmap` like transforms.
+
+    Args:
+        spec: The base spec to reshape
+        prepend: A sequence of integers to add before spec.shape
+        append: A sequence of integers to add after spec.shape
+
+    Returns:
+        The reshaped spec.
+
+    Raises:
+        NotImplementedError:
+            if spec is not of type Array.
+    """
+    if isinstance(spec, DiscreteArray):
+        batched_num = _jnp.broadcast_to(
+            spec.num_values, (*prepend, *spec.num_values.shape, *append)
+        )
+        return spec.replace(num_values=batched_num)
+    elif isinstance(spec, Array):
+        return spec.replace(shape=(*prepend, *spec.shape, *append))
+    else:
+        raise NotImplementedError(
+            f"Spec of type: {type(spec)} has no implemented reshape rule."
+        )
+
+
+def unpack_spec(
+        spec: Spec
+) -> Spec:
+    """Recursively unpack composite specs to a tree of Primitive Specs."""
+    if isinstance(spec, CompositeSpec):
+        return _jax.tree_map(unpack_spec, spec.as_spec_struct())
+    return spec
 
 
 class EnvironmentSpec(_typing.NamedTuple):

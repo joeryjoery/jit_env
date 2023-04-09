@@ -20,6 +20,36 @@ from jit_env import _core
 from jit_env import specs as _specs
 
 
+# TODO
+# def _jspecs_to_dm_env_specs(
+#         spec: jspecs.Spec,
+# ) -> dspecs.Array:
+#
+#     if isinstance(spec, jspecs.DiscreteArray):
+#         return dspecs.DiscreteArray(
+#             num_values=spec.num_values,
+#             dtype=spec.dtype,
+#             name=spec.name or None,
+#         )
+#     elif isinstance(spec, jspecs.BoundedArray):
+#         return dspecs.BoundedArray(
+#             shape=spec.shape,
+#             dtype=spec.dtype,
+#             minimum=spec.minimum,
+#             maximum=spec.maximum,
+#             name=spec.name or None,
+#         )
+#     elif isinstance(spec, jspecs.Array):
+#         return dspecs.Array(
+#             shape=spec.shape,
+#             dtype=spec.dtype,
+#             name=spec.name or None,
+#         )
+#     else:
+#         # may raise exception
+#         return tree_map(_jspecs_to_dm_env_specs, spec)
+
+
 def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
     """If dm_env can be imported, return an Environment and Spec converter
 

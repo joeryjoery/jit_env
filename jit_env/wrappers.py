@@ -8,7 +8,6 @@ This Module implements Wrappers for:
 """
 from __future__ import annotations as _annotations
 import typing as _typing
-import dataclasses as _dataclasses
 
 import jax as _jax
 
@@ -206,12 +205,12 @@ class ResetMixin:
         key, _ = _jax.random.split(state.key)
         state, reset_timestep = self.env.reset(key)
 
-        # Replace observation with reset observation.
-        # Do not modify the rewards, discount, or extras.
-        timestep = _dataclasses.replace(
-            step,
-            observation=reset_timestep.observation,
-            step_type=reset_timestep.step_type,
+        timestep = _core.TimeStep(
+            step_type=reset_timestep.step_type,  # Overwrite step
+            reward=step.reward,
+            discount=step.discount,
+            observation=reset_timestep.observation,  # Overwrite step
+            extras=step.extras
         )
 
         return state, timestep
@@ -301,23 +300,23 @@ class VmapAutoReset(ResetMixin, Vmap):
             action: _core.Action
     ) -> tuple[_core.State, _core.TimeStep]:
 
-        # Batched computation using `Vmap`.
+        # Batched homogenous computation using `Vmap`.
         state, timestep = super().step(state, action)
 
         # Map heterogeneous computation (non-parallelizable).
-        state, timestep = _jax.lax.map(
-            lambda args: self._maybe_reset(*args), (state, timestep)
-        )
+        state, timestep = _jax.lax.map(self._maybe_reset, (state, timestep))
+
         return state, timestep
 
     def _maybe_reset(
-        self, state: _core.State, step: _core.TimeStep
+            self, args: tuple[_core.State, _core.TimeStep]
     ) -> tuple[_core.State, _core.TimeStep]:
         """Helper method defined to prevent recompilations of `lambda`s."""
+        state, step = args
         return _jax.lax.cond(
             step.last(),
             self._auto_reset,
-            lambda *x: x,
+            self._identity,
             state,
             step,
         )
@@ -334,4 +333,8 @@ class TileAutoReset(Tile, VmapAutoReset):
 
     The shortened MRO is given by:
     [TileAutoReset, Tile, BatchSpecMixin, VmapAutoReset, ResetMixin, Vmap, ...]
+
+    The mixed in functions by evalation order are:
+    [(), (reset), (*_spec), (step, _maybe_reset), (_identity, _auto_reset),
+    (reset, step, render)]
     """
