@@ -53,7 +53,6 @@ class Spec(_typing.Generic[_T], metaclass=_abc.ABCMeta):
         Specs are not composable with jax transformations.
     """
     __slots__ = ('_name',)
-    __hash__ = None
 
     def __init__(self, name: str = ""):
         """Initialize a Spec by requiring an explicit naming.
@@ -120,6 +119,23 @@ class PrimitiveSpec(Spec[_T], _typing.Generic[_T], metaclass=_abc.ABCMeta):
     """
     __slots__ = ('_shape', '_dtype')
 
+    def __init__(
+            self,
+            shape: _typing.Sequence[int],
+            dtype: _typing.Any,  # TODO: jax.typing.DTypeLike
+            name: str = ""
+    ):
+        """Initializes a new `Array` spec.
+
+        Args:
+            shape: A Sequence of integers specifying the array shape.
+            dtype: A jax compatible dtype specification for the array.
+            name: Explicit string name for the array specification.
+        """
+        super().__init__(name)
+        self._shape = tuple(shape)
+        self._dtype = _jnp.zeros((), dtype).dtype  # get uniform `dtype` type
+
     @property
     def shape(self) -> int | _typing.Sequence[int]:
         return self._shape
@@ -164,23 +180,6 @@ class CompositeSpec(Spec[_T], _typing.Generic[_T], metaclass=_abc.ABCMeta):
 class Array(PrimitiveSpec):
     """Describes a Jax Array Specification."""
     __slots__ = ()
-
-    def __init__(
-            self,
-            shape: _typing.Sequence[int],
-            dtype: _typing.Any,  # TODO: jax.typing.DTypeLike
-            name: str = ""
-    ):
-        """Initializes a new `Array` spec.
-
-        Args:
-            shape: A Sequence of integers specifying the array shape.
-            dtype: A jax compatible dtype specification for the array.
-            name: Explicit string name for the array specification.
-        """
-        super().__init__(name)
-        self._shape = tuple(shape)
-        self._dtype = _jnp.zeros((), dtype).dtype  # get uniform `dtype` type
 
     def validate(
             self, 
