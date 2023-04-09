@@ -37,6 +37,8 @@ import jax as _jax
 from jax import numpy as _jnp
 from jax import tree_util as _tree_util
 
+import jit_env
+
 _T = _typing.TypeVar("_T")
 
 
@@ -345,16 +347,15 @@ class DiscreteArray(BoundedArray):
                 if `num_values` is not positive or the given `dtype` is not a
                 jax-supported integer type.
         """
+        if not _jnp.issubdtype(dtype, _jnp.integer):
+            raise ValueError(f"`dtype` must be integer, got {dtype}.")
+
         num_values = _jnp.asarray(num_values, dtype)
-        if (not (num_values > 0).all()) or (not _jnp.issubdtype(
-                num_values.dtype, _jnp.integer)):
+        if not (num_values > 0).all():
             raise ValueError(
                 f"`num_values` may only contain positive integers, "
                 f"got {num_values}."
             )
-
-        if not _jnp.issubdtype(dtype, _jnp.integer):
-            raise ValueError(f"`dtype` must be integer, got {dtype}.")
 
         super().__init__(
             shape=_jnp.shape(num_values),
@@ -403,7 +404,7 @@ class Tree(CompositeSpec):
         """Override base `repr` by mapping `repr` over all leave-specs."""
         leave_strs = _jax.tree_map(repr, self.leave_specs)
         tree_str = str(_tree_util.tree_unflatten(self.treedef, leave_strs))
-        return f'{self.__class__.__name__}(name={self.name}, tree={tree_str})'
+        return f'{self.__class__.__name__}(name={self.name},tree={tree_str})'
 
     @property
     def leave_specs(self) -> _typing.Sequence[Spec]:
@@ -436,12 +437,10 @@ class Tree(CompositeSpec):
             self,
             value: _jxtype.PyTree[_jxtype.ArrayLike | None]
     ) -> _jxtype.PyTree[_jxtype.ArrayLike | None]:
-        as_leaves = _tree_util.tree_leaves(value)
-        leaves = _jax.tree_map(
-            lambda v, s: s.validate(v),
-            as_leaves, self.leave_specs
+        return _jax.tree_map(
+            lambda s, v: s.validate(v),
+            self.as_spec_struct(), value
         )
-        return _tree_util.tree_unflatten(self.treedef, leaves)
 
     def generate_value(
             self
@@ -462,7 +461,13 @@ class Tuple(Tree):
                 A sequence of `Spec` objects to treat as a Spec tuple.
             name:
                 Explicit string name for the Tree specification.
+
+        Raises:
+            ValueError: If no specs are provided.
         """
+        if not var_specs:
+            raise ValueError("Cannot initialize an empty Spec")
+
         super().__init__(
             list(var_specs),
             _tree_util.tree_structure(var_specs),
@@ -617,6 +622,15 @@ def unpack_spec(
     if isinstance(spec, CompositeSpec):
         return _jax.tree_map(unpack_spec, spec.as_spec_struct())
     return spec
+
+
+def make_environment_spec(env: jit_env.Environment):
+    return EnvironmentSpec(
+        observations=env.observation_spec(),
+        actions=env.action_spec(),
+        rewards=env.reward_spec(),
+        discounts=env.discount_spec()
+    )
 
 
 class EnvironmentSpec(_typing.NamedTuple):

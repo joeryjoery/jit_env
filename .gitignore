@@ -23,6 +23,7 @@ __pycache__
 */.mypy_cache
 .pytype
 */.pytype
+.coverage
 
 *mypy_out*
 

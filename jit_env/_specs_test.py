@@ -72,23 +72,83 @@ def tree_spec(batch_spec, scalar_spec) -> specs.Tree:
     return specs.Tree(*jax.tree_util.tree_flatten(dummy), name='tree')
 
 
-@pytest.mark.skip
-def test_tree_spec(tree_spec: specs.Tree):
-    my_batch, my_scalar = tree_spec.generate_value()
+def test_illegal_array(matrix_spec):
+    class VargsDummy(specs.Array):
+        def __init__(self, *args):
+            super().__init__(*args)
 
-    tree_spec.validate((my_batch, my_scalar))
-    with pytest.raises(ValueError):
-        # Wrong Pytree structure
-        tree_spec.validate((my_scalar, my_batch))
+    class KwargsDummy(specs.Array):
+        def __init__(self, **kwargs):
+            super().__init__(**kwargs)
 
-    spec_struct = tree_spec.as_spec_struct()
-    spec_struct[0].validate(my_batch)
-    spec_struct[1].validate(my_scalar)
+    v_arr = VargsDummy((), jnp.int32)
+    k_arr = KwargsDummy(shape=(), dtype=jnp.int32)
+
+    with pytest.raises(TypeError):
+        v_arr.replace(shape=(1, ), dtype=jnp.float32)
+
+    with pytest.raises(TypeError):
+        k_arr.replace(shape=(1, ), dtype=jnp.float32)
+
+
+class TestTree:
+
+    def test_validate(self, tree_spec: specs.Tree):
+        out = tree_spec.generate_value()
+
+        tree_spec.validate(out)
+        with pytest.raises(TypeError):
+            # Wrong Pytree structure (batch, batch) should be (batch, scalar)
+            # Error should be raise internally by `jnp.asarray(value)`.
+            tree_spec.validate(
+                DummyStruct(my_spec=out.my_spec, other_spec=out.my_spec)
+            )
+
+    def test_substructs(self, tree_spec: specs.Tree):
+        out = tree_spec.generate_value()
+
+        spec_struct = tree_spec.as_spec_struct()
+
+        spec_struct.my_spec.validate(out.my_spec)
+        spec_struct.other_spec.validate(out.other_spec)
+
+        out_sub = jax.tree_map(lambda s: s.generate_value(), spec_struct)
+
+        chex.assert_trees_all_equal(out, out_sub)
+        chex.assert_trees_all_equal_shapes_and_dtypes(out, out_sub)
+
+    def test_tree_map(self, tree_spec: specs.Tree):
+        out = tree_spec.generate_value()
+
+        out_map = jax.tree_map(lambda s: s.generate_value(), tree_spec)
+        out_map = out_map.as_spec_struct()
+
+        chex.assert_trees_all_equal(out, out_map)
+        chex.assert_trees_all_equal_shapes_and_dtypes(out, out_map)
+
+    def test_repr(self, int_spec):
+        my_tuple = specs.Tuple(int_spec, int_spec, name='tuple')
+        r = repr(my_tuple)
+        s = f'{specs.Tuple.__name__}(name={my_tuple.name},' \
+            f'tree=(\'{repr(int_spec)}\', \'{repr(int_spec)}\'))'
+
+        assert r == s
+
+    def test_empty_dict(self):
+        with pytest.raises(ValueError):
+            _ = specs.Dict()
+
+    def test_empty_tuple(self):
+        with pytest.raises(ValueError):
+            _ = specs.Tuple()
+
+    def test_replace(self, tree_spec):
+        with pytest.raises(RuntimeError):
+            tree_spec.replace(key_does_not_matter=None)
 
 
 class TestBatched:
 
-    @pytest.mark.skip
     def test_validate(self, batch_spec: specs.Batched):
         out_dict = batch_spec.generate_value()
 
@@ -109,6 +169,10 @@ class TestBatched:
         assert my_vec.shape == (BATCH_SIZE, *VECTOR_SHAPE)
         assert my_mat.shape == (BATCH_SIZE, *MATRIX_SHAPE)
 
+    def test_empty_batch(self, int_spec):
+        with pytest.raises(ValueError):
+            _ = specs.Batched(int_spec, 0)
+
     def test_struct(self, batch_spec: specs.Batched):
         out_dict = batch_spec.generate_value()
 
@@ -118,8 +182,7 @@ class TestBatched:
         )
 
         chex.assert_trees_all_equal(out_dict, new_dict)
-        chex.assert_trees_all_equal_shapes(out_dict, new_dict)
-        chex.assert_trees_all_equal_dtypes(out_dict, new_dict)
+        chex.assert_trees_all_equal_shapes_and_dtypes(out_dict, new_dict)
 
 
 class TestArray:
@@ -174,8 +237,14 @@ class TestBounded:
         with pytest.raises(ValueError):
             # Non-broadcastable
             _ = specs.BoundedArray(
-                shape=(5, 5, 5), dtype=jnp.float32,
-                minimum=jnp.zeros((3, 1, 3)), maximum=jnp.ones((1, 3, 1))
+                shape=(2, 2, 2), dtype=jnp.float32,
+                minimum=jnp.zeros((3, 1, 3)), maximum=jnp.ones((2,))
+            )
+        with pytest.raises(ValueError):
+            # Non-broadcastable
+            _ = specs.BoundedArray(
+                shape=(2, 2, 2), dtype=jnp.float32,
+                minimum=jnp.zeros((2,)), maximum=jnp.ones((3, 1, 3))
             )
 
     def test_spec(self, bounded_vector_spec):

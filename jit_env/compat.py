@@ -20,36 +20,6 @@ from jit_env import _core
 from jit_env import specs as _specs
 
 
-# TODO
-# def _jspecs_to_dm_env_specs(
-#         spec: jspecs.Spec,
-# ) -> dspecs.Array:
-#
-#     if isinstance(spec, jspecs.DiscreteArray):
-#         return dspecs.DiscreteArray(
-#             num_values=spec.num_values,
-#             dtype=spec.dtype,
-#             name=spec.name or None,
-#         )
-#     elif isinstance(spec, jspecs.BoundedArray):
-#         return dspecs.BoundedArray(
-#             shape=spec.shape,
-#             dtype=spec.dtype,
-#             minimum=spec.minimum,
-#             maximum=spec.maximum,
-#             name=spec.name or None,
-#         )
-#     elif isinstance(spec, jspecs.Array):
-#         return dspecs.Array(
-#             shape=spec.shape,
-#             dtype=spec.dtype,
-#             name=spec.name or None,
-#         )
-#     else:
-#         # may raise exception
-#         return tree_map(_jspecs_to_dm_env_specs, spec)
-
-
 def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
     """If dm_env can be imported, return an Environment and Spec converter
 
@@ -68,7 +38,30 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
         return None
 
     def specs_to_dm_specs(spec: _specs.Spec) -> dm_specs.Array:
-        pass  # TODO
+        """Convert a compatible `jit_env` spec into a dm_env spec (tree)."""
+
+        if isinstance(spec, _specs.DiscreteArray):
+            return dm_specs.DiscreteArray(
+                num_values=spec.num_values,
+                dtype=spec.dtype,
+                name=spec.name or None,
+            )
+        elif isinstance(spec, _specs.BoundedArray):
+            return dm_specs.BoundedArray(
+                shape=spec.shape,
+                dtype=spec.dtype,
+                minimum=spec.minimum,
+                maximum=spec.maximum,
+                name=spec.name or None,
+            )
+        elif isinstance(spec, _specs.Array):
+            return dm_specs.Array(
+                shape=spec.shape,
+                dtype=spec.dtype,
+                name=spec.name or None,
+            )
+        else:
+            return _jax.tree_map(specs_to_dm_specs, _specs.unpack_spec(spec))
 
     class ToDeepmindEnv(dm_env.Environment):
         """A dm_env.Environment that wraps a jit_env.Environment.
@@ -88,6 +81,10 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
 
             self._state = None
 
+            # Precompile dm_env compatible environment specs.
+            env_spec = _specs.make_environment_spec(env)
+            self._env_spec = _jax.tree_map(specs_to_dm_specs, env_spec)
+
         def reset(self) -> dm_env.TimeStep:
             self.rng, key = _jax.random.split(self.rng)
             self._state, step = self.env.reset(key)
@@ -105,16 +102,16 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
             )
 
         def observation_spec(self):
-            return specs_to_dm_specs(self.env.observation_spec())
+            return self._env_spec.observations
 
         def action_spec(self):
-            return specs_to_dm_specs(self.env.action_spec())
+            return self._env_spec.actions
 
         def reward_spec(self):
-            return specs_to_dm_specs(self.env.reward_spec())
+            return self._env_spec.rewards
 
         def discount_spec(self):
-            return specs_to_dm_specs(self.env.discount_spec())
+            return self._env_spec.discounts
 
     return ToDeepmindEnv, specs_to_dm_specs
 
