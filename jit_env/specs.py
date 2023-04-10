@@ -94,6 +94,7 @@ class Spec(_typing.Generic[_T], metaclass=_abc.ABCMeta):
 
     def _fail_validation(self, message: str):
         """Helper function for creating jax transform-compatible errors."""
+
         def _raiser(*_):
             raise ValueError(message + f' for spec "{self.name}"')
 
@@ -184,7 +185,7 @@ class Array(PrimitiveSpec):
     __slots__ = ()
 
     def validate(
-            self, 
+            self,
             value: _jxtype.ArrayLike
     ) -> _jxtype.ArrayLike:
         value = _jnp.asarray(value)
@@ -235,12 +236,12 @@ class BoundedArray(Array):
     __slots__ = ('_minimum', '_maximum')
 
     def __init__(
-        self,
-        shape: _typing.Sequence[int],
-        dtype: _typing.Any,  # TODO: jax.typing.DTypeLike
-        minimum: int | float | _jxtype.Num[_jxtype.Array, '...'],
-        maximum: int | float | _jxtype.Num[_jxtype.Array, '...'],
-        name: str = ""
+            self,
+            shape: _typing.Sequence[int],
+            dtype: _typing.Any,  # TODO: jax.typing.DTypeLike
+            minimum: int | float | _jxtype.Num[_jxtype.Array, '...'],
+            maximum: int | float | _jxtype.Num[_jxtype.Array, '...'],
+            name: str = ""
     ):
         """Initializes a new `BoundedArray` spec.
 
@@ -292,7 +293,7 @@ class BoundedArray(Array):
         return self._maximum
 
     def validate(
-            self, 
+            self,
             value: _jxtype.ArrayLike
     ) -> _jxtype.ArrayLike:
         """Check if value falls inbetween the specified bounds."""
@@ -328,9 +329,9 @@ class DiscreteArray(BoundedArray):
     __slots__ = ()
 
     def __init__(
-            self, 
+            self,
             num_values: int | _typing.Sequence[int] | _jxtype.Integer[
-                _jxtype.Array, '...'  
+                _jxtype.Array, '...'
             ],
             dtype: _typing.Any = _jnp.int32,  # TODO: jax.typing.DTypeLike
             name: str = ""
@@ -580,6 +581,33 @@ class Batched(CompositeSpec, _typing.Generic[_T]):
 
 
 # Utility functions for handling Spec types
+
+@_typing.overload
+def reshape_spec(
+        spec: Array,
+        prepend: _typing.Sequence[int] = (),
+        append: _typing.Sequence[int] = ()
+) -> Array:
+    ...
+
+
+@_typing.overload
+def reshape_spec(
+        spec: BoundedArray,
+        prepend: _typing.Sequence[int] = (),
+        append: _typing.Sequence[int] = ()
+) -> BoundedArray:
+    ...
+
+
+@_typing.overload
+def reshape_spec(
+        spec: DiscreteArray,
+        prepend: _typing.Sequence[int] = (),
+        append: _typing.Sequence[int] = ()
+) -> DiscreteArray:
+    ...
+
 
 def reshape_spec(
         spec: Spec,

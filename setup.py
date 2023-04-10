@@ -45,6 +45,9 @@ setup(
         'pytest>=7.1.2',
         'twine>=4.0.2',
         'wheel>=0.37.1',
+        'tox>=4.4.11',
+        'flake8>=6.0.0',
+        'mypy>=1.2.0',
         'dm_env>=1.5'
     ]},
     classifiers=[

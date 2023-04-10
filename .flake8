@@ -1,0 +1,15 @@
+[flake8]
+extend-ignore =
+    F722
+per-file-ignores =
+    jit_env/__init__.py:F401
+    jit_env/compat.py:C901
+exclude =
+    .git,
+    .tox
+    __pycache__,
+    build,
+    dist,
+    local
+max-line-length = 79
+max-complexity = 10

@@ -7,9 +7,7 @@ import chex
 import jax
 from jax import numpy as jnp
 
-import jit_env
 from jit_env import specs
-
 
 INT_SIZE: int = 3
 BATCH_SIZE: int = 2
@@ -85,10 +83,10 @@ def test_illegal_array(matrix_spec):
     k_arr = KwargsDummy(shape=(), dtype=jnp.int32)
 
     with pytest.raises(TypeError):
-        v_arr.replace(shape=(1, ), dtype=jnp.float32)
+        v_arr.replace(shape=(1,), dtype=jnp.float32)
 
     with pytest.raises(TypeError):
-        k_arr.replace(shape=(1, ), dtype=jnp.float32)
+        k_arr.replace(shape=(1,), dtype=jnp.float32)
 
 
 class TestTree:
@@ -312,21 +310,19 @@ class TestDiscrete:
 class TestReshape:
 
     def test_discrete(self, int_spec):
-
-        appended = specs.reshape_spec(int_spec, append=(BATCH_SIZE, ))
-        prepended = specs.reshape_spec(int_spec, prepend=(BATCH_SIZE, ))
-        both = specs.reshape_spec(int_spec, (BATCH_SIZE, ), (BATCH_SIZE, ))
+        appended = specs.reshape_spec(int_spec, append=(BATCH_SIZE,))
+        prepended = specs.reshape_spec(int_spec, prepend=(BATCH_SIZE,))
+        both = specs.reshape_spec(int_spec, (BATCH_SIZE,), (BATCH_SIZE,))
 
         back = appended.generate_value()
         front = prepended.generate_value()
         both = both.generate_value()
 
-        assert back.shape == (BATCH_SIZE, )
-        assert front.shape == (BATCH_SIZE, )
+        assert back.shape == (BATCH_SIZE,)
+        assert front.shape == (BATCH_SIZE,)
         assert both.shape == (BATCH_SIZE, BATCH_SIZE)
 
     def test_array(self, matrix_spec):
-
         appended = specs.reshape_spec(matrix_spec, append=(BATCH_SIZE,))
         prepended = specs.reshape_spec(matrix_spec, prepend=(BATCH_SIZE,))
         both = specs.reshape_spec(matrix_spec, (BATCH_SIZE,), (BATCH_SIZE,))
@@ -337,10 +333,9 @@ class TestReshape:
 
         assert back.shape == (*MATRIX_SHAPE, BATCH_SIZE,)
         assert front.shape == (BATCH_SIZE, *MATRIX_SHAPE)
-        assert both.shape == (BATCH_SIZE, *MATRIX_SHAPE,  BATCH_SIZE)
+        assert both.shape == (BATCH_SIZE, *MATRIX_SHAPE, BATCH_SIZE)
 
     def test_composite(self, tree_spec):
-
         with pytest.raises(NotImplementedError):
             specs.reshape_spec(tree_spec, prepend=(BATCH_SIZE,))
 
