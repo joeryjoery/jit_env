@@ -13,6 +13,8 @@ def _parse_requirements(path: str) -> list[str]:
 _pwd = os.path.dirname(os.path.abspath(__file__))
 _req = _parse_requirements(os.path.join(
     _pwd, './', 'requirements.txt'))
+_req_dev = _parse_requirements(os.path.join(
+    _pwd, './', 'requirements_dev.txt'))
 
 _d = {}
 with open('jit_env/version.py') as f:
@@ -41,15 +43,7 @@ setup(
     license='MIT',
     python_requires='>=3.7',
     install_requires=_req,
-    extras_require={'dev': [
-        'pytest>=7.1.2',
-        'twine>=4.0.2',
-        'wheel>=0.37.1',
-        'tox>=4.4.11',
-        'flake8>=6.0.0',
-        'mypy>=1.2.0',
-        'dm_env>=1.5'
-    ]},
+    extras_require={'dev': _req_dev},
     classifiers=[
         'Operating System :: OS Independent',
         'License :: OSI Approved :: MIT License',
