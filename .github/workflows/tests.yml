@@ -2,9 +2,9 @@ name: CI with Tox Tests
 
 on:
   push:
-    branches: [ "main", "ci" ]
+    branches: [ "main" ]
   pull_request:
-    branches: [ "main", "ci" ]
+    branches: [ "main" ]
 
 permissions:
   contents: read
