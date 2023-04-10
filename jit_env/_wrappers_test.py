@@ -3,7 +3,6 @@ import pytest
 
 import jax
 from jax import numpy as jnp
-from jax import tree_util
 
 import jit_env
 from jit_env import wrappers, specs
@@ -14,6 +13,10 @@ def test_jit(dummy_env: jit_env.Environment):
     jitted = wrappers.Jit(dummy_env)
 
     # Reset logic
+
+    # For type checker
+    jit_state: jit_env.State
+
     state, step = dummy_env.reset(jax.random.PRNGKey(0))
     jit_state, jit_step = jitted.reset(jax.random.PRNGKey(0))
 
@@ -92,6 +95,10 @@ class TestVmap:
         batched = wrappers.Vmap(dummy_env)
 
         # Reset logic
+
+        # For type checker
+        states: jit_env.State
+
         state, step = dummy_env.reset(key)
         states, steps = batched.reset(jax.random.split(key, num=batch_size))
 
@@ -122,6 +129,9 @@ class TestVmap:
         key = jax.random.PRNGKey(0)
         batched = wrappers.Vmap(dummy_env)
 
+        # For type checker
+        states: jit_env.State
+
         state, _ = dummy_env.reset(key)
         states, _ = batched.reset(jax.random.split(key, num=batch_size))
 
@@ -142,14 +152,14 @@ class TestVmap:
 
         keys = jax.random.split(jax.random.PRNGKey(0), num=5)
         first, _ = vmap_first.reset(keys)
-        last, _ = vmap_last.reset(keys)
+        last: jit_env.State = vmap_last.reset(keys)[0]
 
         with pytest.raises(TypeError):
             # lax.cond in AutoReset will receive incompatible Array of bools
-            vmap_first.step(first, jnp.zeros((5, )))
+            vmap_first.step(first, jnp.zeros((5,)))
 
         # Array of bools can be handled per element by vmapping last.
-        vmap_last.step(last, jnp.zeros((5, )))
+        vmap_last.step(last, jnp.zeros((5,)))
 
     @pytest.mark.usefixtures('dummy_env')
     def test_autoreset(self, dummy_env: jit_env.Environment, num: int = 2):
@@ -159,8 +169,12 @@ class TestVmap:
             wrappers.AutoReset(dummy_env), in_axes=(0, None)
         )
         singly_wrapped = wrappers.VmapAutoReset(dummy_env, in_axes=(0, None))
-
         keys = jax.random.split(jax.random.PRNGKey(0), num=num)
+
+        # For type checker
+        doubly_out: tuple[jit_env.State, jit_env.TimeStep]
+        singly_out: tuple[jit_env.State, jit_env.TimeStep]
+
         doubly_out = doubly_wrapped.reset(keys)
         singly_out = singly_wrapped.reset(keys)
 
@@ -222,8 +236,12 @@ class TestTile:
         # Test to cover all behaviour of reward_spec and discount_spec.
         env_spec = specs.make_environment_spec(dummy_env)
 
-        dummy_env.reward_spec = lambda *_: specs.Tuple(env_spec.rewards)
-        dummy_env.discount_spec = lambda *_: specs.Tuple(env_spec.discounts)
+        dummy_env.reward_spec = lambda *_: specs.Tuple(  # type: ignore
+            env_spec.rewards
+        )
+        dummy_env.discount_spec = lambda *_: specs.Tuple(  # type: ignore
+            env_spec.discounts
+        )
 
         tiled = wrappers.Tile(dummy_env, num=num)
         batch_spec = specs.make_environment_spec(tiled)
@@ -251,32 +269,37 @@ class TestTile:
         tiled = wrappers.TileAutoReset(dummy_env, num=num, in_axes=(0, None))
 
         keys = jax.random.split(jax.random.PRNGKey(0), num=num)
-        doubly_out = vmapped.reset(keys)
-        singly_out = tiled.reset(jax.random.PRNGKey(0))
 
-        chex.assert_trees_all_equal(doubly_out, singly_out, ignore_nones=True)
+        # For type checker
+        vmap_out: tuple[jit_env.State, jit_env.TimeStep]
+        tile_out: tuple[jit_env.State, jit_env.TimeStep]
+
+        vmap_out = vmapped.reset(keys)
+        tile_out = tiled.reset(jax.random.PRNGKey(0))
+
+        chex.assert_trees_all_equal(vmap_out, tile_out, ignore_nones=True)
         chex.assert_trees_all_equal_shapes_and_dtypes(
-            singly_out, doubly_out, ignore_nones=True
+            tile_out, vmap_out, ignore_nones=True
         )
 
         a = jnp.zeros(())  # Action is held constant across batch
         for _ in range(5):
-            doubly_out = vmapped.step(doubly_out[0], a)
-            singly_out = tiled.step(singly_out[0], a)
+            vmap_out = vmapped.step(vmap_out[0], a)
+            tile_out = tiled.step(tile_out[0], a)
 
             chex.assert_trees_all_equal(
-                doubly_out, singly_out, ignore_nones=True
+                vmap_out, tile_out, ignore_nones=True
             )
             chex.assert_trees_all_equal_shapes_and_dtypes(
-                singly_out, doubly_out, ignore_nones=True
+                tile_out, vmap_out, ignore_nones=True
             )
 
-        doubly_out = vmapped.step(doubly_out[0], None)
-        singly_out = tiled.step(singly_out[0], None)
+        vmap_out = vmapped.step(vmap_out[0], None)
+        tile_out = tiled.step(tile_out[0], None)
 
         chex.assert_trees_all_equal(
-            doubly_out, singly_out, ignore_nones=True
+            vmap_out, tile_out, ignore_nones=True
         )
         chex.assert_trees_all_equal_shapes_and_dtypes(
-            singly_out, doubly_out, ignore_nones=True
+            tile_out, vmap_out, ignore_nones=True
         )
