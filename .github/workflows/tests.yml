@@ -1,4 +1,4 @@
-name: Run Tox Tests
+name: CI with Tox Tests
 
 on:
   push:

@@ -1,3 +1,6 @@
+![Run Tox Tests](https://github.com/joeryjoery/jit_env/actions/workflows/tests.yml/badge.svg)
+![Python Version](https://img.shields.io/badge/Python-3.9%20%7C%203.10%20%7C%203.11-blue)
+![Package Version](https://img.shields.io/badge/jit__env-0.0.1a0-blue)
 # `jit_env`: A Jax Compatible RL Environment API
 `jit_env` is a library that aims to adhere closely to the `dm_env` interface
 while allowing for `jax` transformations inside Environment implementations
