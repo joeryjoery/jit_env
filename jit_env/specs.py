@@ -204,6 +204,12 @@ class Array(PrimitiveSpec):
         """Generate a value which conforms to this spec."""
         return _jnp.zeros(self.shape, self.dtype)
 
+    def __reduce__(
+            self
+    ) -> tuple[_typing.Type[Array], tuple[_typing.Any, ...]]:
+        """Specify how to de-serialize (unpickle) this class Type."""
+        return Array, (self._shape, self._dtype, self._name)
+
     def _get_constructor_kwargs(self) -> _typing.Any:
         """Returns constructor kwargs for instantiating a copy of self."""
         params = _inspect.signature(
@@ -323,6 +329,13 @@ class BoundedArray(Array):
             shape=self.shape, fill_value=self.minimum, dtype=self.dtype
         )
 
+    def __reduce__(
+            self
+    ) -> tuple[_typing.Type[BoundedArray], tuple[_typing.Any, ...]]:
+        """Specify how to de-serialize (unpickle) this class Type."""
+        return BoundedArray, (self._shape, self._dtype,
+                              self._minimum, self._maximum, self._name)
+
 
 class DiscreteArray(BoundedArray):
     """A variant of BoundedArray with strict integer values and minimum=0."""
@@ -369,6 +382,12 @@ class DiscreteArray(BoundedArray):
     @property
     def num_values(self) -> _jxtype.Integer[_jxtype.Array, '...']:
         return self.maximum + 1
+
+    def __reduce__(
+            self
+    ) -> tuple[_typing.Type[DiscreteArray], tuple[_typing.Any, ...]]:
+        """Specify how to de-serialize (unpickle) this class Type."""
+        return DiscreteArray, (self._maximum+1, self._dtype, self._name)
 
 
 @_tree_util.register_pytree_node_class

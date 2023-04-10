@@ -1,6 +1,7 @@
 from __future__ import annotations
 import pytest
 import typing
+import pickle
 
 import chex
 
@@ -91,6 +92,33 @@ def test_illegal_array(matrix_spec):
 
 class TestTree:
 
+    def test_serialize(self, tree_spec):
+        reconstructed = pickle.loads(pickle.dumps(tree_spec))
+
+        assert isinstance(reconstructed, tree_spec.__class__)
+
+        chex.assert_trees_all_equal(
+            tree_spec.generate_value(),
+            reconstructed.generate_value()
+        )
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            tree_spec.generate_value(),
+            reconstructed.generate_value()
+        )
+
+        def check_leaf(leaf_a, leaf_b):
+
+            assert isinstance(leaf_b, leaf_a.__class__)
+
+            assert leaf_a.dtype == leaf_b.dtype
+            assert leaf_a.shape == leaf_b.shape
+            assert leaf_a.name == leaf_b.name
+
+        spec_tree = specs.unpack_spec(tree_spec)
+        reconstructed_tree = pickle.loads(pickle.dumps(spec_tree))
+
+        _ = jax.tree_map(check_leaf, spec_tree, reconstructed_tree)
+
     def test_validate(self, tree_spec: specs.Tree):
         out = tree_spec.generate_value()
 
@@ -147,6 +175,33 @@ class TestTree:
 
 class TestBatched:
 
+    def test_serialize(self, batch_spec):
+        reconstructed = pickle.loads(pickle.dumps(batch_spec))
+
+        assert isinstance(reconstructed, batch_spec.__class__)
+
+        chex.assert_trees_all_equal(
+            batch_spec.generate_value(),
+            reconstructed.generate_value()
+        )
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            batch_spec.generate_value(),
+            reconstructed.generate_value()
+        )
+
+        def check_leaf(leaf_a, leaf_b):
+
+            assert isinstance(leaf_b, leaf_a.__class__)
+
+            assert leaf_a.dtype == leaf_b.dtype
+            assert leaf_a.shape == leaf_b.shape
+            assert leaf_a.name == leaf_b.name
+
+        spec_tree = specs.unpack_spec(batch_spec)
+        reconstructed_tree = pickle.loads(pickle.dumps(spec_tree))
+
+        _ = jax.tree_map(check_leaf, spec_tree, reconstructed_tree)
+
     def test_validate(self, batch_spec: specs.Batched):
         out_dict = batch_spec.generate_value()
 
@@ -184,6 +239,24 @@ class TestBatched:
 
 
 class TestArray:
+
+    def test_serialize(self, scalar_spec):
+        reconstructed = pickle.loads(pickle.dumps(scalar_spec))
+
+        assert isinstance(reconstructed, scalar_spec.__class__)
+
+        assert scalar_spec.dtype == reconstructed.dtype
+        assert scalar_spec.shape == reconstructed.shape
+        assert scalar_spec.name == reconstructed.name
+
+        chex.assert_trees_all_equal(
+            scalar_spec.generate_value(),
+            reconstructed.generate_value()
+        )
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            scalar_spec.generate_value(),
+            reconstructed.generate_value()
+        )
 
     def test_slots(self, scalar_spec):
         with pytest.raises(AttributeError):
@@ -226,6 +299,24 @@ class TestArray:
 
 
 class TestBounded:
+
+    def test_serialize(self, bounded_vector_spec):
+        reconstructed = pickle.loads(pickle.dumps(bounded_vector_spec))
+
+        assert isinstance(reconstructed, bounded_vector_spec.__class__)
+
+        assert bounded_vector_spec.dtype == reconstructed.dtype
+        assert bounded_vector_spec.shape == reconstructed.shape
+        assert bounded_vector_spec.name == reconstructed.name
+
+        chex.assert_trees_all_equal(
+            bounded_vector_spec.generate_value(),
+            reconstructed.generate_value()
+        )
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            bounded_vector_spec.generate_value(),
+            reconstructed.generate_value()
+        )
 
     def test_wrong_bounds(self):
         with pytest.raises(ValueError):
@@ -270,6 +361,24 @@ class TestBounded:
 
 
 class TestDiscrete:
+
+    def test_serialize(self, int_spec):
+        reconstructed = pickle.loads(pickle.dumps(int_spec))
+
+        assert isinstance(reconstructed, int_spec.__class__)
+
+        assert int_spec.dtype == reconstructed.dtype
+        assert int_spec.shape == reconstructed.shape
+        assert int_spec.name == reconstructed.name
+
+        chex.assert_trees_all_equal(
+            int_spec.generate_value(),
+            reconstructed.generate_value()
+        )
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            int_spec.generate_value(),
+            reconstructed.generate_value()
+        )
 
     def test_wrong_num_values(self):
         with pytest.raises(ValueError):
