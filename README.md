@@ -11,7 +11,6 @@ Like `dm_env` our API consists of the main components:
 - `jit_env.Environment`: An abstract base class for RL environments.
 - `jit_env.TimeStep`: A container class representing the outputs of the environment on each time step (transition).
 - `jit_env.specs`: A module containing primitives that are used to describe the format of the actions consumed by an environment, as well as the observations, rewards, and discounts it returns.
-- TODO: Testing is a work in progress.
 
 This is extended with the components:
 - `jit_env.Wrapper`: An interface built on top of Environment that allows modular transformations of the base Environment.
@@ -20,7 +19,7 @@ This is extended with the components:
 - `jit_env.wrappers`: A Module containing a few generally useful implementations for `Wrapper` (that simultaneously serves as a reference).
 
 Note that this module is only an interface and does not implement any
-Environments itself.
+Environments itself. The implementations in `examples` serve to illustrate the syntax.
 
 ## Installation
 `jit_env` can be installed with:
