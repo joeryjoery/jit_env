@@ -13,7 +13,7 @@ import jaxtyping as jxtype
 
 class MyState(NamedTuple):
     key: jax.random.KeyArray
-    count: jxtype.Integer[jxtype.Array, '']
+    count: jxtype.Int32[jxtype.Array, '']  # type: ignore
 
 
 class CountingEnv(jit_env.Environment):

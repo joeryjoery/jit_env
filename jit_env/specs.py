@@ -128,7 +128,7 @@ class PrimitiveSpec(Spec[_T], _typing.Generic[_T], metaclass=_abc.ABCMeta):
             dtype: _typing.Any,  # TODO: jax.typing.DTypeLike
             name: str = ""
     ):
-        """Initializes a new `Array` spec.
+        """Initializes a new `PrimitiveSpec` spec.
 
         Args:
             shape: A Sequence of integers specifying the array shape.
@@ -584,10 +584,10 @@ class Batched(CompositeSpec, _typing.Generic[_T]):
 
 @_typing.overload
 def reshape_spec(
-        spec: Array,
+        spec: DiscreteArray,
         prepend: _typing.Sequence[int] = (),
         append: _typing.Sequence[int] = ()
-) -> Array:
+) -> DiscreteArray:
     ...
 
 
@@ -602,10 +602,19 @@ def reshape_spec(
 
 @_typing.overload
 def reshape_spec(
-        spec: DiscreteArray,
+        spec: Array,
         prepend: _typing.Sequence[int] = (),
         append: _typing.Sequence[int] = ()
-) -> DiscreteArray:
+) -> Array:
+    ...
+
+
+@_typing.overload
+def reshape_spec(
+        spec: Spec,
+        prepend: _typing.Sequence[int] = (),
+        append: _typing.Sequence[int] = ()
+) -> Spec:
     ...
 
 
@@ -636,7 +645,9 @@ def reshape_spec(
         )
         return spec.replace(num_values=batched_num)
     elif isinstance(spec, Array):
-        return spec.replace(shape=(*prepend, *spec.shape, *append))
+        return spec.replace(
+            shape=(*prepend, *spec.shape, *append)  # type: ignore
+        )
     else:
         raise NotImplementedError(
             f"Spec of type: {type(spec)} has no implemented reshape rule."
