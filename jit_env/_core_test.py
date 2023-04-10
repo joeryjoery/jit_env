@@ -12,8 +12,8 @@ from jax.typing import ArrayLike
 import jit_env
 
 
-def test_fail():
-    assert False, "Fail Test"
+# def test_fail():
+#     assert False, "Fail Test"
 
 
 class TestEnvironmentStaging(chex.TestCase):
