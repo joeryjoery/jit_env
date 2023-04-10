@@ -11,6 +11,7 @@ import typing as _typing
 
 import jax as _jax
 
+import jit_env
 from jit_env import _core
 from jit_env import specs as _specs
 
@@ -61,18 +62,40 @@ class Vmap(_core.Wrapper):
     the batch dimensions.
     """
 
+    def __init__(self, env: jit_env.Environment, **step_vmap_kwargs):
+        """Initializes the transforming `env.step` and `env.reset` with vmap.
+
+        The step function may receive additional keyword arguments to modify
+        behaviour. Unlike Jit, these kwargs are not used for transforming
+        the reset function. This may be useful for holding either a state or
+        an action constant using `in_axes`, which is not symmetrically
+        compatible with `reset`.
+
+        Args:
+            env:
+                The environment to batch using jax.vmap.
+            **step_vmap_kwargs:
+                keyword arguments passed to jax.vmap only for `env.step`.
+                Defer to the jax documentation for up-to-date documentation
+                on the keyword arguments.
+        """
+        super().__init__(env)
+
+        self._step_fun = _jax.vmap(env.step, **step_vmap_kwargs)
+        self._reset_fun = _jax.vmap(env.reset)
+
     def reset(
             self,
             key: _jax.random.KeyArray  # (Batch, dim_key)
     ) -> tuple[_core.State, _core.TimeStep]:
-        return _jax.vmap(self.env.reset)(key)
+        return self._reset_fun(key)
 
     def step(
             self,
             state: _core.State,  # Tree[(Batch, dim_leaf), ...]
             action: _core.Action  # Tree[(Batch, dim_leaf), ...]
     ) -> tuple[_core.State, _core.TimeStep]:
-        return _jax.vmap(self.env.step)(state, action)
+        return self._step_fun(state, action)
 
     def render(self, state: _core.State) -> _typing.Any:
         """Generate a pixel-observation based on the 0'th state slice. """
@@ -216,7 +239,7 @@ class ResetMixin:
         return state, timestep
 
     @staticmethod
-    def _identity(x: _typing.Any) -> _typing.Any:
+    def _identity(*x: _typing.Any) -> _typing.Any:
         """Helper method defined to prevent recompilations of `lambda`s.
 
         Args:

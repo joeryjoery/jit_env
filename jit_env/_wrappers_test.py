@@ -1,3 +1,4 @@
+import chex
 import pytest
 
 import jax
@@ -5,46 +6,277 @@ from jax import numpy as jnp
 from jax import tree_util
 
 import jit_env
-from jit_env import wrappers
+from jit_env import wrappers, specs
 
 
 @pytest.mark.usefixtures('dummy_env')
-@pytest.mark.parametrize('num', [1, 2])
-def test_tile(dummy_env: jit_env.Environment, num: int):
-    seed = jax.random.PRNGKey(0)
-    state, step = dummy_env.reset(seed)
+def test_jit(dummy_env: jit_env.Environment):
+    jitted = wrappers.Jit(dummy_env)
 
-    action = dummy_env.action_spec().generate_value()
-    new_state, new_step = dummy_env.step(state, action)
+    # Reset logic
+    state, step = dummy_env.reset(jax.random.PRNGKey(0))
+    jit_state, jit_step = jitted.reset(jax.random.PRNGKey(0))
 
-    tiled_env = wrappers.Tile(dummy_env, num=num)
-    states, steps = tiled_env.reset(seed)  # type: ignore
-
-    actions = tiled_env.action_spec().generate_value()
-    new_states, new_steps = tiled_env.step(states, actions)
-
-    matching_init_states = tree_util.tree_map(
-        lambda a, b: jnp.shape(a) == (num, *jnp.shape(b)),
-        states, state
+    chex.assert_trees_all_equal(state, jit_state, ignore_nones=True)
+    chex.assert_trees_all_equal(step, jit_step, ignore_nones=True)
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        state, jit_state, ignore_nones=True
     )
-    matching_init_steps = tree_util.tree_map(
-        lambda a, b: jnp.shape(a) == (num, *jnp.shape(b)),
-        steps, step
-    )
-    matching_states = tree_util.tree_map(
-        lambda a, b: jnp.shape(a) == (num, *jnp.shape(b)),
-        new_states, new_state
-    )
-    matching_steps = tree_util.tree_map(
-        lambda a, b: jnp.shape(a) == (num, *jnp.shape(b)),
-        new_steps, new_step
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        (step,), (jit_step,), ignore_nones=True
     )
 
-    assert all(tree_util.tree_leaves(matching_init_states)), \
-        "Mismatching Initial State dimensions!"
-    assert all(tree_util.tree_leaves(matching_init_steps)), \
-        "Mismatching Initial TimeStep dimensions!"
-    assert all(tree_util.tree_leaves(matching_states)), \
-        "Mismatching State dimensions!"
-    assert all(tree_util.tree_leaves(matching_steps)), \
-        "Mismatching TimeStep dimensions!"
+    # Step logic
+    state, step = dummy_env.step(state, jnp.zeros(()))
+    jit_state, jit_step = jitted.step(jit_state, jnp.zeros(()))
+
+    chex.assert_trees_all_equal(state, jit_state, ignore_nones=True)
+    chex.assert_trees_all_equal(step, jit_step, ignore_nones=True)
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        state, jit_state, ignore_nones=True
+    )
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        (step,), (jit_step,), ignore_nones=True
+    )
+
+
+@pytest.mark.usefixtures('dummy_env')
+def test_autoreset(dummy_env: jit_env.Environment):
+    env = wrappers.AutoReset(dummy_env)
+
+    state, step = env.reset(jax.random.PRNGKey(0))
+    ref_state, ref_step = dummy_env.reset(jax.random.PRNGKey(0))
+
+    assert step.first()
+    assert ref_step.first()
+
+    chex.assert_trees_all_equal(step, ref_step, ignore_nones=True)
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        (step,), (ref_step,), ignore_nones=True
+    )
+
+    for _ in range(5):
+        state, step = env.step(state, 0.0)
+        ref_state, ref_step = dummy_env.step(ref_state, 0.0)
+
+        assert step.mid()
+        assert ref_step.mid()
+
+        chex.assert_trees_all_equal(step, ref_step, ignore_nones=True)
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            (step,), (ref_step,), ignore_nones=True
+        )
+
+    state, step = env.step(state, None)
+    ref_state, ref_step = dummy_env.step(ref_state, None)
+
+    assert step.first()
+    assert ref_step.last()
+
+    assert jnp.all(step.reward == 1.0)
+    assert jnp.all(step.reward == ref_step.reward)
+
+    assert jnp.all(step.discount == 0.0)
+    assert jnp.all(step.discount == ref_step.discount)
+
+    # AutoReset resets observation to zero, ref_step has 1.0 from `step`.
+    assert jnp.all(step.observation == 0.0)
+    assert jnp.all(step.observation != ref_step.observation)
+
+
+class TestVmap:
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_env(self, dummy_env: jit_env.Environment, batch_size: int = 5):
+        key = jax.random.PRNGKey(0)
+        batched = wrappers.Vmap(dummy_env)
+
+        # Reset logic
+        state, step = dummy_env.reset(key)
+        states, steps = batched.reset(jax.random.split(key, num=batch_size))
+
+        chex.assert_tree_shape_prefix(
+            (states, steps), (batch_size,), ignore_nones=True
+        )
+
+        sliced = jax.tree_map(lambda x: x.at[0].get(), (states, steps))
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            sliced, (state, step), ignore_nones=True
+        )
+
+        # Step logic
+        state, step = dummy_env.step(state, jnp.zeros(()))
+        states, steps = batched.step(states, jnp.zeros((batch_size,)))
+
+        chex.assert_tree_shape_prefix(
+            (states, steps), (batch_size,), ignore_nones=True
+        )
+
+        sliced = jax.tree_map(lambda x: x.at[0].get(), (states, steps))
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            sliced, (state, step), ignore_nones=True
+        )
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_render(self, dummy_env: jit_env.Environment, batch_size: int = 5):
+        key = jax.random.PRNGKey(0)
+        batched = wrappers.Vmap(dummy_env)
+
+        state, _ = dummy_env.reset(key)
+        states, _ = batched.reset(jax.random.split(key, num=batch_size))
+
+        single_render = dummy_env.render(state)
+        batch_render = batched.render(states)
+
+        chex.assert_trees_all_equal(
+            single_render, batch_render, ignore_nones=True
+        )
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            single_render, batch_render, ignore_nones=True
+        )
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_wrongly_wrapped_autoreset(self, dummy_env: jit_env.Environment):
+        vmap_first = wrappers.AutoReset(wrappers.Vmap(dummy_env))
+        vmap_last = wrappers.Vmap(wrappers.AutoReset(dummy_env))
+
+        keys = jax.random.split(jax.random.PRNGKey(0), num=5)
+        first, _ = vmap_first.reset(keys)
+        last, _ = vmap_last.reset(keys)
+
+        with pytest.raises(TypeError):
+            # lax.cond in AutoReset will receive incompatible Array of bools
+            vmap_first.step(first, jnp.zeros((5, )))
+
+        # Array of bools can be handled per element by vmapping last.
+        vmap_last.step(last, jnp.zeros((5, )))
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_autoreset(self, dummy_env: jit_env.Environment, num: int = 2):
+        # Doubly or single-wrapping should both work.
+        # Singly is preferred as it is faster, this is not explicitly tested.
+        doubly_wrapped = wrappers.Vmap(
+            wrappers.AutoReset(dummy_env), in_axes=(0, None)
+        )
+        singly_wrapped = wrappers.VmapAutoReset(dummy_env, in_axes=(0, None))
+
+        keys = jax.random.split(jax.random.PRNGKey(0), num=num)
+        doubly_out = doubly_wrapped.reset(keys)
+        singly_out = singly_wrapped.reset(keys)
+
+        chex.assert_trees_all_equal(doubly_out, singly_out, ignore_nones=True)
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            singly_out, doubly_out, ignore_nones=True
+        )
+
+        a = jnp.zeros(())  # Action is held constant across batch
+        for _ in range(5):
+            doubly_out = doubly_wrapped.step(doubly_out[0], a)
+            singly_out = singly_wrapped.step(singly_out[0], a)
+
+            chex.assert_trees_all_equal(
+                doubly_out, singly_out, ignore_nones=True
+            )
+            chex.assert_trees_all_equal_shapes_and_dtypes(
+                singly_out, doubly_out, ignore_nones=True
+            )
+
+        doubly_out = doubly_wrapped.step(doubly_out[0], None)
+        singly_out = singly_wrapped.step(singly_out[0], None)
+
+        chex.assert_trees_all_equal(
+            doubly_out, singly_out, ignore_nones=True
+        )
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            singly_out, doubly_out, ignore_nones=True
+        )
+
+
+class TestTile:
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_empty(self, dummy_env: jit_env.Environment):
+        with pytest.raises(ValueError):
+            wrappers.Tile(dummy_env, 0)
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_spec(self, dummy_env: jit_env.Environment, num: int = 2):
+        tiled_env = wrappers.Tile(dummy_env, num=num)
+
+        spec = specs.make_environment_spec(dummy_env)
+        batch_spec = specs.make_environment_spec(tiled_env)
+
+        samples = jax.tree_map(lambda s: s.generate_value(), spec)
+        batch = jax.tree_map(lambda s: s.generate_value(), batch_spec)
+
+        chex.assert_tree_shape_prefix(batch, (num,), ignore_nones=True)
+
+        for i in range(num):
+            sliced = jax.tree_map(lambda x: x.at[i].get(), batch)
+            chex.assert_trees_all_equal_shapes_and_dtypes(
+                sliced, samples, ignore_nones=True
+            )
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_modified_spec(self, dummy_env: jit_env.Environment, num: int = 2):
+        # Test to cover all behaviour of reward_spec and discount_spec.
+        env_spec = specs.make_environment_spec(dummy_env)
+
+        dummy_env.reward_spec = lambda *_: specs.Tuple(env_spec.rewards)
+        dummy_env.discount_spec = lambda *_: specs.Tuple(env_spec.discounts)
+
+        tiled = wrappers.Tile(dummy_env, num=num)
+        batch_spec = specs.make_environment_spec(tiled)
+
+        assert isinstance(batch_spec.rewards, specs.Batched)
+        assert isinstance(batch_spec.discounts, specs.Batched)
+
+        assert batch_spec.rewards.num == num
+        assert batch_spec.discounts.num == num
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_tile(self, dummy_env: jit_env.Environment, num: int = 2):
+        # Test distinguishing feature of Tile Vs. Vmap.
+        tiled_env = wrappers.Tile(dummy_env, num=num)
+        states, steps = tiled_env.reset(jax.random.PRNGKey(0))  # type: ignore
+
+        chex.assert_tree_shape_prefix(
+            (states, steps), (num,), ignore_nones=True
+        )
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_autoreset(self, dummy_env: jit_env.Environment, num: int = 2):
+        # Tile and Vmap are equivalent aside from the `reset` call.
+        vmapped = wrappers.VmapAutoReset(dummy_env, in_axes=(0, None))
+        tiled = wrappers.TileAutoReset(dummy_env, num=num, in_axes=(0, None))
+
+        keys = jax.random.split(jax.random.PRNGKey(0), num=num)
+        doubly_out = vmapped.reset(keys)
+        singly_out = tiled.reset(jax.random.PRNGKey(0))
+
+        chex.assert_trees_all_equal(doubly_out, singly_out, ignore_nones=True)
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            singly_out, doubly_out, ignore_nones=True
+        )
+
+        a = jnp.zeros(())  # Action is held constant across batch
+        for _ in range(5):
+            doubly_out = vmapped.step(doubly_out[0], a)
+            singly_out = tiled.step(singly_out[0], a)
+
+            chex.assert_trees_all_equal(
+                doubly_out, singly_out, ignore_nones=True
+            )
+            chex.assert_trees_all_equal_shapes_and_dtypes(
+                singly_out, doubly_out, ignore_nones=True
+            )
+
+        doubly_out = vmapped.step(doubly_out[0], None)
+        singly_out = tiled.step(singly_out[0], None)
+
+        chex.assert_trees_all_equal(
+            doubly_out, singly_out, ignore_nones=True
+        )
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            singly_out, doubly_out, ignore_nones=True
+        )

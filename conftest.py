@@ -19,14 +19,16 @@ class DummyEnv(jit_env.Environment):
             self,
             key: jax.random.KeyArray
     ) -> tuple[jit_env.State, jit_env.TimeStep]:
-        return DummyState(key=key), jit_env.restart(0.0)
+        return DummyState(key=key), jit_env.restart(jax.numpy.zeros(()))
 
     def step(
             self,
             state: jit_env.State,
             action: jit_env.Action
     ) -> tuple[jit_env.State, jit_env.TimeStep]:
-        return state, jit_env.transition(1.0, 1.0, 1.0)
+        if action is None:
+            return state, jit_env.termination(*jax.numpy.ones((2,)), shape=())
+        return state, jit_env.transition(*jax.numpy.ones((3,)))
 
     def reward_spec(self) -> specs.Spec:
         return specs.BoundedArray((), float, 0.0, 1.0, 'reward')
@@ -41,7 +43,7 @@ class DummyEnv(jit_env.Environment):
         return specs.Array((), float, 'action')
 
     def render(self, state: jit_env.State) -> Any:
-        pass
+        return jax.numpy.ones(())
 
 
 @pytest.fixture
