@@ -20,6 +20,8 @@ This is extended with the components:
 
 Note that this module is only an interface and does not implement any
 Environments itself. The implementations in `examples` serve to illustrate the syntax.
+For a more thorough review of the semantics, please refer to the [dm-env](https://github.com/deepmind/dm_env/blob/master/dm_env/specs.py) 
+wiki and compare our implementation of `jit_env.Environment` with `dm_env.Environment` and the conversion as given in [`compat.py`](https://github.com/joeryjoery/jit_env/blob/main/jit_env/compat.py).
 
 ## Installation
 `jit_env` can be installed with:
