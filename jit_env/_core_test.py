@@ -12,32 +12,39 @@ from jax.typing import ArrayLike
 import jit_env
 
 
-@pytest.mark.usefixtures('dummy_env')
-def test_environment_staging(dummy_env: jit_env.Environment):
-    """Test compatibility with different kinds of jax acceleration options."""
+# def test_fail():
+#     assert False, "Fail Test"
+
+
+class TestEnvironmentStaging(chex.TestCase):
 
     @chex.all_variants
-    def step(
-            s: jit_env.State,
-            a: jit_env.Action
-    ) -> tuple[jit_env.State, jit_env.TimeStep]:
-        return dummy_env.step(s, a)
+    @pytest.mark.skip('resolve fixture unused by chex.variant')
+    def test_environment_staging(self, dummy_env: jit_env.Environment):  # TODO
+        """Test compatibility with different kinds of jax staging options."""
 
-    @chex.all_variants
-    def reset(
-            key: jax.random.KeyArray
-    ) -> tuple[jit_env.State, jit_env.TimeStep]:
-        return dummy_env.reset(key)
+        @self.variant
+        def step_variant(
+                s: jit_env.State,
+                a: jit_env.Action
+        ) -> tuple[jit_env.State, jit_env.TimeStep]:
+            return dummy_env.step(s, a)
 
-    action = dummy_env.action_spec().generate_value()
+        @self.variant
+        def reset_variant(
+                key: jax.random.KeyArray
+        ) -> tuple[jit_env.State, jit_env.TimeStep]:
+            return dummy_env.reset(key)
 
-    state, step = dummy_env.reset(jax.random.PRNGKey(0))
-    assert hasattr(state, 'key'), "State has no PRNGKey attribute!"
-    assert step.first(), "Reset did not set TimeStep.step = StepType.FIRST"
+        action = dummy_env.action_spec().generate_value()
 
-    state, step = dummy_env.step(state, action)
-    assert hasattr(state, 'key'), "State has no PRNGKey attribute!"
-    assert not step.first(), "Reset did not update TimeStep.step."
+        state, step = reset_variant(jax.random.PRNGKey(0))
+        assert hasattr(state, 'key'), "State has no PRNGKey attribute!"
+        assert step.first(), "Reset did not set TimeStep.step = StepType.FIRST"
+
+        state, step = step_variant(state, action)
+        assert hasattr(state, 'key'), "State has no PRNGKey attribute!"
+        assert not step.first(), "Reset did not update TimeStep.step."
 
 
 @pytest.mark.parametrize(

@@ -47,4 +47,3 @@ class DummyEnv(jit_env.Environment):
 @pytest.fixture
 def dummy_env():
     return DummyEnv()
-

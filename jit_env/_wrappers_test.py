@@ -11,13 +11,14 @@ from jit_env import wrappers
 @pytest.mark.usefixtures('dummy_env')
 @pytest.mark.parametrize('num', [1, 2])
 def test_tile(dummy_env: jit_env.Environment, num: int):
-    state, step = dummy_env.reset(jax.random.PRNGKey(0))
+    seed = jax.random.PRNGKey(0)
+    state, step = dummy_env.reset(seed)
 
     action = dummy_env.action_spec().generate_value()
     new_state, new_step = dummy_env.step(state, action)
 
     tiled_env = wrappers.Tile(dummy_env, num=num)
-    states, steps = tiled_env.reset(jax.random.PRNGKey(0))
+    states, steps = tiled_env.reset(seed)  # type: ignore
 
     actions = tiled_env.action_spec().generate_value()
     new_states, new_steps = tiled_env.step(states, actions)

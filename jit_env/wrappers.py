@@ -130,7 +130,7 @@ class BatchSpecMixin:
         """
         spec = self.env.reward_spec()
         if isinstance(spec, _specs.Array):
-            return spec.replace(shape=(self.num, *spec.shape))
+            return _specs.reshape_spec(spec, prepend=(self.num,))
 
         return _specs.Batched(self.env.reward_spec(), num=self.num)
 
@@ -143,7 +143,7 @@ class BatchSpecMixin:
         spec = self.env.discount_spec()
         if isinstance(spec, _specs.BoundedArray):
             # TODO: Not compatibile with Array (should not be valid anyway).
-            return spec.replace(shape=(self.num, *spec.shape))
+            return _specs.reshape_spec(spec, prepend=(self.num,))
 
         return _specs.Batched(self.env.discount_spec(), num=self.num)
 
@@ -161,7 +161,7 @@ class Tile(BatchSpecMixin, Vmap):
     """
 
     def reset(
-            self, 
+            self,
             key: _jax.random.KeyArray
     ) -> tuple[_core.State, _core.TimeStep]:
         return super().reset(_jax.random.split(key, num=self.num))
@@ -299,7 +299,6 @@ class VmapAutoReset(ResetMixin, Vmap):
             state: _core.State,
             action: _core.Action
     ) -> tuple[_core.State, _core.TimeStep]:
-
         # Batched homogenous computation using `Vmap`.
         state, timestep = super().step(state, action)
 

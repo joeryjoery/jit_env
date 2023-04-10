@@ -31,6 +31,9 @@ __pycache__
 .pytest_cache
 */.pytest_cache
 
+# CI Tests
+.tox
+
 # Local testing/ data folder
 local
 */local
