@@ -607,7 +607,7 @@ def reshape_spec(
         prepend: _typing.Sequence[int] = (),
         append: _typing.Sequence[int] = ()
 ) -> DiscreteArray:
-    ...
+    ...  # pragma: no cover
 
 
 @_typing.overload
@@ -616,7 +616,7 @@ def reshape_spec(
         prepend: _typing.Sequence[int] = (),
         append: _typing.Sequence[int] = ()
 ) -> BoundedArray:
-    ...
+    ...  # pragma: no cover
 
 
 @_typing.overload
@@ -625,7 +625,7 @@ def reshape_spec(
         prepend: _typing.Sequence[int] = (),
         append: _typing.Sequence[int] = ()
 ) -> Array:
-    ...
+    ...  # pragma: no cover
 
 
 @_typing.overload
@@ -634,7 +634,7 @@ def reshape_spec(
         prepend: _typing.Sequence[int] = (),
         append: _typing.Sequence[int] = ()
 ) -> Spec:
-    ...
+    ...  # pragma: no cover
 
 
 def reshape_spec(

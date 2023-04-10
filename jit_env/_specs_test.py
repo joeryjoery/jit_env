@@ -90,6 +90,26 @@ def test_illegal_array(matrix_spec):
         k_arr.replace(shape=(1,), dtype=jnp.float32)
 
 
+@pytest.mark.usefixtures('dummy_env')
+def test_environment_spec(dummy_env):
+    env_spec = specs.make_environment_spec(dummy_env)
+
+    r = dummy_env.reward_spec()
+    o = dummy_env.observation_spec()
+    d = dummy_env.discount_spec()
+    a = dummy_env.action_spec()
+
+    def check_spec(spec, reference):
+        assert spec.shape == reference.shape
+        assert spec.dtype == reference.dtype
+        assert spec.name == reference.name
+
+    _ = jax.tree_map(check_spec, env_spec.rewards, r)
+    _ = jax.tree_map(check_spec, env_spec.observations, o)
+    _ = jax.tree_map(check_spec, env_spec.discounts, d)
+    _ = jax.tree_map(check_spec, env_spec.actions, a)
+
+
 class TestTree:
 
     def test_serialize(self, tree_spec):
@@ -107,7 +127,6 @@ class TestTree:
         )
 
         def check_leaf(leaf_a, leaf_b):
-
             assert isinstance(leaf_b, leaf_a.__class__)
 
             assert leaf_a.dtype == leaf_b.dtype
@@ -190,7 +209,6 @@ class TestBatched:
         )
 
         def check_leaf(leaf_a, leaf_b):
-
             assert isinstance(leaf_b, leaf_a.__class__)
 
             assert leaf_a.dtype == leaf_b.dtype
