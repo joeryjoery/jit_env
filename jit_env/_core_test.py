@@ -1,50 +1,80 @@
 from __future__ import annotations
-
-import jax.random
-import jaxtyping
-import pytest
+import typing
 
 import chex
 
+import jaxtyping
+import pytest
+
+import jax
 from jax import numpy as jnp
-from jax.typing import ArrayLike
 
 import jit_env
 
 
-# def test_fail():
-#     assert False, "Fail Test"
+@pytest.mark.usefixtures('dummy_env')
+def test_env_context(dummy_env: jit_env.Environment):
+
+    class SupportsCloseCalled(typing.Protocol):
+        close_called: bool
+
+    def close_override(obj: SupportsCloseCalled):
+        obj.close_called = True
+
+    # Hacky attribute override to check if env is properly closed.
+    env_cls = type(
+        'MyEnv',
+        (type(dummy_env),),
+        {'close_called': False, 'close': close_override}
+    )
+
+    with env_cls() as my_env:
+        state, step = my_env.reset(jax.random.PRNGKey(0))
+        assert step.first()
+
+        state, step = my_env.step(state, 0.0)
+        assert step.mid()
+
+        state, step = my_env.step(state, None)
+        assert step.last()
+
+    # Check if env called `close`.
+    assert my_env.close_called
 
 
-class TestEnvironmentStaging(chex.TestCase):
+@pytest.mark.usefixtures('dummy_env')
+def test_empty_wrapper(dummy_env: jit_env.Environment):
+    wrapped: jit_env.Wrapper = jit_env.Wrapper(dummy_env)
 
-    @chex.all_variants
-    @pytest.mark.skip('resolve fixture unused by chex.variant')
-    def test_environment_staging(self, dummy_env: jit_env.Environment):  # TODO
-        """Test compatibility with different kinds of jax staging options."""
+    spec = jit_env.specs.make_environment_spec(dummy_env)
+    wrapped_spec = jit_env.specs.make_environment_spec(wrapped)
 
-        @self.variant
-        def step_variant(
-                s: jit_env.State,
-                a: jit_env.Action
-        ) -> tuple[jit_env.State, jit_env.TimeStep]:
-            return dummy_env.step(s, a)
+    spec_samples = jax.tree_map(lambda s: s.generate_value(), spec)
+    wrap_samples = jax.tree_map(lambda s: s.generate_value(), wrapped_spec)
 
-        @self.variant
-        def reset_variant(
-                key: jax.random.KeyArray
-        ) -> tuple[jit_env.State, jit_env.TimeStep]:
-            return dummy_env.reset(key)
+    _ = jax.tree_map(lambda a, b: a.validate(b), spec, wrap_samples)
+    _ = jax.tree_map(lambda a, b: a.validate(b), wrapped_spec, spec_samples)
 
-        action = dummy_env.action_spec().generate_value()
+    chex.assert_trees_all_equal(spec_samples, wrap_samples, ignore_nones=True)
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        spec_samples, wrap_samples, ignore_nones=True
+    )
 
-        state, step = reset_variant(jax.random.PRNGKey(0))
-        assert hasattr(state, 'key'), "State has no PRNGKey attribute!"
-        assert step.first(), "Reset did not set TimeStep.step = StepType.FIRST"
+    out = dummy_env.reset(jax.random.PRNGKey(0))
+    wrap_out = wrapped.reset(jax.random.PRNGKey(0))
 
-        state, step = step_variant(state, action)
-        assert hasattr(state, 'key'), "State has no PRNGKey attribute!"
-        assert not step.first(), "Reset did not update TimeStep.step."
+    chex.assert_trees_all_equal(out, wrap_out, ignore_nones=True)
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        out, wrap_out, ignore_nones=True
+    )
+
+    out = dummy_env.step(out[0], spec.actions.generate_value())
+    wrap_out = wrapped.step(wrap_out[0], wrapped_spec.actions.generate_value())
+
+    chex.assert_trees_all_equal(out, wrap_out, ignore_nones=True)
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        out, wrap_out, ignore_nones=True
+    )
 
 
 @pytest.mark.parametrize(
@@ -70,7 +100,7 @@ class TestTimeStepHelpers:
     )
     def test_restart(
             self,
-            observation: ArrayLike,
+            observation: jaxtyping.ArrayLike,
             shape: tuple[int, ...]
     ):
         step: jit_env.TimeStep = jit_env.restart(observation, shape=shape)
@@ -101,9 +131,9 @@ class TestTimeStepHelpers:
     )
     def test_transition(
             self,
-            observation: ArrayLike,
-            reward: ArrayLike,
-            discount: ArrayLike
+            observation: jaxtyping.ArrayLike,
+            reward: jaxtyping.ArrayLike,
+            discount: jaxtyping.ArrayLike
     ):
         step: jit_env.TimeStep = jit_env.transition(
             reward=reward, observation=observation, discount=discount
@@ -134,8 +164,8 @@ class TestTimeStepHelpers:
     )
     def test_termination(
             self,
-            reward: ArrayLike,
-            observation: ArrayLike,
+            reward: jaxtyping.ArrayLike,
+            observation: jaxtyping.ArrayLike,
             shape: tuple[int, ...]
     ):
         step = jit_env.termination(reward, observation, shape=shape)
@@ -166,9 +196,9 @@ class TestTimeStepHelpers:
     )
     def test_truncation(
             self,
-            reward: ArrayLike,
-            observation: ArrayLike,
-            discount: ArrayLike
+            reward: jaxtyping.ArrayLike,
+            observation: jaxtyping.ArrayLike,
+            discount: jaxtyping.ArrayLike
     ):
         step = jit_env.truncation(reward, observation, discount)
 

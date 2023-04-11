@@ -1,6 +1,6 @@
 from __future__ import annotations
-from typing import Any, NamedTuple
-import dataclasses
+from typing import Any, TYPE_CHECKING
+from dataclasses import replace
 
 import jax
 import jax.numpy as jnp
@@ -11,7 +11,15 @@ from jit_env import specs
 import jaxtyping as jxtype
 
 
-class MyState(NamedTuple):
+if TYPE_CHECKING:  # pragma: no cover
+    # See: https://github.com/python/mypy/issues/6239
+    from dataclasses import dataclass
+else:
+    from chex import dataclass
+
+
+@dataclass(frozen=True)
+class MyState:
     key: jax.random.KeyArray
     count: jxtype.Int32[jxtype.Array, '']  # type: ignore
 
@@ -39,7 +47,7 @@ class CountingEnv(jit_env.Environment):
             state: jit_env.State,
             action: jit_env.Action
     ) -> tuple[jit_env.State, jit_env.TimeStep]:
-        state = dataclasses.replace(state, count=state.count + action)
+        state = replace(state, count=state.count + action)
 
         step = jax.lax.cond(
             state.count < self.maximum,
@@ -60,10 +68,10 @@ class CountingEnv(jit_env.Environment):
         )
 
     def observation_spec(self) -> specs.Spec:
-        return specs.DiscreteArray(self.maximum, jnp.float32, 'observation')
+        return specs.Array((), jnp.int32, 'observation')
 
     def action_spec(self) -> specs.Spec:
-        return specs.DiscreteArray(self.maximum, jnp.float32, 'action')
+        return specs.DiscreteArray(self.maximum, jnp.int32, 'action')
 
     def render(self, state: jit_env.State) -> Any:
-        return
+        return  # pragma: no cover

@@ -27,7 +27,7 @@ class DummyEnv(jit_env.Environment):
             action: jit_env.Action
     ) -> tuple[jit_env.State, jit_env.TimeStep]:
         if action is None:
-            return state, jit_env.termination(*jax.numpy.ones((2,)), shape=())
+            return state, jit_env.termination(*jax.numpy.ones((2,)))
         return state, jit_env.transition(*jax.numpy.ones((3,)))
 
     def reward_spec(self) -> specs.Spec:

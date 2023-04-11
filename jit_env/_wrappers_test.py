@@ -9,6 +9,29 @@ from jit_env import wrappers, specs
 
 
 @pytest.mark.usefixtures('dummy_env')
+def test_repr(dummy_env: jit_env.Environment):
+    wrapped = wrappers.Jit(dummy_env)
+
+    assert str(wrapped) == f'{wrapped.__class__.__name__}(' \
+                           f'{dummy_env.__class__.__name__})'
+
+    # Since Jit doesn't modify `repr` or str this should hold.
+    assert repr(wrapped) == str(wrapped)
+
+
+def test_unwrap(dummy_env: jit_env.Environment):
+    wrapped = wrappers.Jit(dummy_env)
+    doubly_wrapped = wrappers.Vmap(wrapped)
+
+    assert wrapped.unwrapped is dummy_env
+    assert doubly_wrapped.unwrapped is dummy_env
+    assert dummy_env.unwrapped is dummy_env
+
+    assert wrapped.env is dummy_env
+    assert doubly_wrapped.env is wrapped
+
+
+@pytest.mark.usefixtures('dummy_env')
 def test_jit(dummy_env: jit_env.Environment):
     jitted = wrappers.Jit(dummy_env)
 

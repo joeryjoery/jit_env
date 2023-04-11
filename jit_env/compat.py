@@ -16,6 +16,8 @@ import typing as _typing
 
 import jax as _jax
 
+import jaxtyping as _jxtype
+
 from jit_env import _core
 from jit_env import specs as _specs
 
@@ -34,18 +36,28 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
     try:
         import dm_env
         from dm_env import specs as dm_specs
-    except ModuleNotFoundError:
+    except ModuleNotFoundError:  # pragma: no cover
         return None
 
-    def specs_to_dm_specs(spec: _specs.Spec) -> dm_specs.Array:
+    def specs_to_dm_specs(spec: _specs.Spec) -> _jxtype.PyTree[dm_specs.Array]:
         """Convert a compatible `jit_env` spec into a dm_env spec (tree)."""
 
         if isinstance(spec, _specs.DiscreteArray):
-            return dm_specs.DiscreteArray(
-                num_values=spec.num_values,
-                dtype=spec.dtype,
-                name=spec.name or None,
-            )
+            int_shape = _jax.numpy.shape(spec.num_values)
+            if len(int_shape):
+                return dm_specs.BoundedArray(
+                    shape=int_shape,
+                    dtype=spec.dtype,
+                    minimum=0,
+                    maximum=spec.num_values,
+                    name=spec.name or None
+                )
+            else:
+                return dm_specs.DiscreteArray(
+                    num_values=int(spec.num_values),
+                    dtype=spec.dtype,
+                    name=spec.name or None,
+                )
         elif isinstance(spec, _specs.BoundedArray):
             return dm_specs.BoundedArray(
                 shape=spec.shape,
@@ -117,4 +129,4 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
 
 
 def make_gymnasium_wrapper() -> None | tuple[_typing.Callable, type]:
-    pass  # TODO
+    ...  # pragma: no cover  # TODO

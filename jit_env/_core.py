@@ -12,7 +12,8 @@ import abc
 from typing import Any, TYPE_CHECKING, TypeVar, Generic, Sequence, Protocol
 from dataclasses import field
 
-if TYPE_CHECKING:  # https://github.com/python/mypy/issues/6239
+if TYPE_CHECKING:  # pragma: no cover
+    # See: https://github.com/python/mypy/issues/6239
     from dataclasses import dataclass
 else:
     from chex import dataclass
@@ -113,7 +114,7 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
 
     def __repr__(self) -> str:
         """Returns a complete informative representation of self."""
-        return super().__repr__()
+        return self.__str__()
 
     @property
     def unwrapped(self) -> Environment:
@@ -223,8 +224,22 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
         """
 
     def render(self, state: State) -> Any:
-        """Generate a pixel-observation based on the given state. """
-        raise NotImplementedError("Render Function not Implemented")
+        """Generate a pixel-observation based on the given state.
+
+        This method is not annotated as abstract as implementing a render
+        is not neccesary to perform experiments. However it will raise
+        an Error if called without an implementation.
+
+        Args:
+            state: A state object to generate a visualization of.
+
+        Raises:
+            NotImplementedError:
+                If subclass does not implement this method.
+         """
+        raise NotImplementedError(  # pragma: no cover
+            "Render Function not Implemented"
+        )
 
     def __enter__(self) -> Environment:
         """Allows the environment to be used in a with-statement context."""
