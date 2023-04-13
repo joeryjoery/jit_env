@@ -37,8 +37,14 @@ class Jit(_core.Wrapper):
 
         super().__init__(env)
 
+        self._jit_kwargs = jit_kwargs
         self._step_fun = _jax.jit(env.step, **jit_kwargs)
         self._reset_fun = _jax.jit(env.reset, **jit_kwargs)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(" \
+               f"env={repr(self.env)}," \
+               f"jit_kwargs={self._jit_kwargs})"
 
     def reset(
             self,
@@ -81,8 +87,15 @@ class Vmap(_core.Wrapper):
         """
         super().__init__(env)
 
+        self._step_vmap_kwargs = step_vmap_kwargs
+
         self._step_fun = _jax.vmap(env.step, **step_vmap_kwargs)
         self._reset_fun = _jax.vmap(env.reset)
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(" \
+               f"env={repr(self.env)}," \
+               f"step_vmap_kwargs={self._step_vmap_kwargs})"
 
     def reset(
             self,
@@ -182,6 +195,12 @@ class Tile(BatchSpecMixin, Vmap):
     The constructor is called first through `BatchSpecMixin` which
     simultaneously requires the user to define the batch-size as `num`.
     """
+
+    def __repr__(self) -> str:
+        return f"{self.__class__.__name__}(" \
+               f"env={repr(self.env)}," \
+               f"num={self.num}," \
+               f"step_vmap_kwargs={self._step_vmap_kwargs})"
 
     def reset(
             self,

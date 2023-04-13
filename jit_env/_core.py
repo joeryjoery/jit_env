@@ -113,7 +113,11 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
         return self.__class__.__name__
 
     def __repr__(self) -> str:
-        """Returns a complete informative representation of self."""
+        """Returns a complete informative representation of self.
+
+        Opposed to `str`, the class should be reconstructable from the
+        `repr` information.
+        """
         return self.__str__()
 
     @property
@@ -273,6 +277,14 @@ class Wrapper(
     def __str__(self) -> str:
         """Returns a recursive composition structure of all Wrappers."""
         return f"{self.__class__.__name__}({str(self.env)})"
+
+    def __repr__(self) -> str:
+        """Returns a recursive complete informative representation of self.
+
+        Opposed to `str`, the Wrapped class hierarchy should be
+        reconstructable from the `repr` information.
+        """
+        return f"{self.__class__.__name__}(env={repr(self.env)})"
 
     @property
     def env(self):
