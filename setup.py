@@ -39,6 +39,7 @@ setup(
     author_email="J.A.deVries@tudelft.nl",
     keywords='reinforcement-learning python machine learning jax',
     packages=find_packages(),
+    package_data={'jit_env': ['py.typed']},
     url='https://github.com/joeryjoery/jit_env',
     license='MIT',
     python_requires='>=3.7',
