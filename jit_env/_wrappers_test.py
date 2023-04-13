@@ -8,15 +8,46 @@ import jit_env
 from jit_env import wrappers, specs
 
 
-@pytest.mark.usefixtures('dummy_env')
-def test_repr(dummy_env: jit_env.Environment):
-    wrapped = wrappers.Jit(dummy_env)
+class TestRepr:
 
-    assert str(wrapped) == f'{wrapped.__class__.__name__}(' \
-                           f'{dummy_env.__class__.__name__})'
+    def test_empty(self, dummy_env: jit_env.Environment):
+        wrapped = jit_env.Wrapper(dummy_env)
 
-    # Since Jit doesn't modify `repr` or str this should hold.
-    assert repr(wrapped) == str(wrapped)
+        assert str(wrapped) == f'{wrapped.__class__.__name__}(' \
+                               f'{dummy_env.__class__.__name__})'
+        assert repr(wrapped) == f'{wrapped.__class__.__name__}(' \
+                                f'env={dummy_env.__class__.__name__})'
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_jit(self, dummy_env: jit_env.Environment):
+        wrapped = wrappers.Jit(dummy_env)
+
+        assert str(wrapped) == f'{wrapped.__class__.__name__}(' \
+                               f'{dummy_env.__class__.__name__})'
+        assert repr(wrapped) == f'{wrapped.__class__.__name__}(' \
+                                f'env={dummy_env.__class__.__name__},' \
+                                f'jit_kwargs={{}})'
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_vmap(self, dummy_env: jit_env.Environment):
+        wrapped = wrappers.Vmap(dummy_env)
+
+        assert str(wrapped) == f'{wrapped.__class__.__name__}(' \
+                               f'{dummy_env.__class__.__name__})'
+        assert repr(wrapped) == f'{wrapped.__class__.__name__}(' \
+                                f'env={dummy_env.__class__.__name__},' \
+                                f'step_vmap_kwargs={{}})'
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_tile(self, dummy_env: jit_env.Environment, num: int = 2):
+        wrapped = wrappers.Tile(dummy_env, num=num, in_axes=(0, None))
+
+        assert str(wrapped) == f'{wrapped.__class__.__name__}(' \
+                               f'{dummy_env.__class__.__name__})'
+        assert repr(wrapped) == f'{wrapped.__class__.__name__}(' \
+                                f'env={dummy_env.__class__.__name__},' \
+                                f'num={num},' \
+                                f'step_vmap_kwargs={{\'in_axes\': (0, None)}})'
 
 
 def test_unwrap(dummy_env: jit_env.Environment):
