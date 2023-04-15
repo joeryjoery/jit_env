@@ -261,8 +261,7 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
                 If no renderer is provided to Environment.
         """
         if self._renderer is None:
-            # pragma: no cover
-            raise NotImplementedError(
+            raise NotImplementedError(  # pragma: no cover
                 "Render Function not Implemented"
             )
         return self._renderer(state)
