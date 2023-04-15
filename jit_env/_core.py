@@ -9,7 +9,9 @@ This module defines:
 from __future__ import annotations
 import abc
 
-from typing import Any, TYPE_CHECKING, TypeVar, Generic, Sequence, Protocol
+from typing import (
+    Any, TYPE_CHECKING, TypeVar, Generic, Sequence, Protocol, Callable
+)
 from dataclasses import field
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -107,6 +109,23 @@ class TimeStep(Generic[Observation]):
 
 class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
     """Interface for defining Environment logic for RL-Agents. """
+
+    def __init__(self, *, renderer: Callable[[State], Any] | None = None):
+        """
+        Initializes the Environment by optionally providing a renderer.
+
+        The renderer should be separated from the Environment logic itself
+        to reduce coupling. The Agent's behaviour should not depend
+        on rendered images, this is to provide a visualization for the user.
+
+        Args:
+            renderer:
+                A callable from States to a visually rendered object of State.
+                The visuals are for the user, and not the agent. If renderer
+                is None, then calling Environment.render will raise a
+                NotImplementedError.
+        """
+        self._renderer = renderer
 
     def __str__(self) -> str:
         """Returns a minimal representation of the Environment Structure."""
@@ -230,20 +249,23 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
     def render(self, state: State) -> Any:
         """Generate a pixel-observation based on the given state.
 
-        This method is not annotated as abstract as implementing a render
-        is not neccesary to perform experiments. However it will raise
-        an Error if called without an implementation.
+        To support rendering environments, this should be provided within
+        the Environment's constructor. Otherwise, calling this function
+        will raise a NotImplementedError.
 
         Args:
             state: A state object to generate a visualization of.
 
         Raises:
             NotImplementedError:
-                If subclass does not implement this method.
-         """
-        raise NotImplementedError(  # pragma: no cover
-            "Render Function not Implemented"
-        )
+                If no renderer is provided to Environment.
+        """
+        if self._renderer is None:
+            # pragma: no cover
+            raise NotImplementedError(
+                "Render Function not Implemented"
+            )
+        return self._renderer(state)
 
     def __enter__(self) -> Environment:
         """Allows the environment to be used in a with-statement context."""
@@ -262,7 +284,7 @@ class Wrapper(
 ):
     """Interface for Composing Environment logic for RL-Agents. """
 
-    def __init__(self, env: Environment):
+    def __init__(self, env: Environment, *args, **kwargs):
         """Initializes the Composite Environment with a base Environment.
 
         The `env` attribute can be accessed for reading out attributes, but it
@@ -270,8 +292,11 @@ class Wrapper(
 
         Args:
             env: The base environment to extend with functionality.
+
+            args: See Environment
+            kwargs: See Environment
         """
-        super().__init__()
+        super().__init__(*args, **kwargs)
         self._env = env
 
     def __str__(self) -> str:
