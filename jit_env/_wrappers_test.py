@@ -11,7 +11,7 @@ from jit_env import wrappers, specs
 class TestRepr:
 
     def test_empty(self, dummy_env: jit_env.Environment):
-        wrapped = jit_env.Wrapper(dummy_env)
+        wrapped: jit_env.Wrapper = jit_env.Wrapper(dummy_env)
 
         assert str(wrapped) == f'{wrapped.__class__.__name__}(' \
                                f'{dummy_env.__class__.__name__})'

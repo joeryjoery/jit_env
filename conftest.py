@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, NamedTuple
+from typing import NamedTuple
 
 import pytest
 
@@ -14,6 +14,9 @@ class DummyState(NamedTuple):
 
 
 class DummyEnv(jit_env.Environment):
+
+    def __init__(self):
+        super().__init__(renderer=lambda *_: jax.numpy.ones(()))
 
     def reset(
             self,
@@ -41,9 +44,6 @@ class DummyEnv(jit_env.Environment):
 
     def action_spec(self) -> specs.Spec:
         return specs.Array((), float, 'action')
-
-    def render(self, state: jit_env.State) -> Any:
-        return jax.numpy.ones(())
 
 
 @pytest.fixture
