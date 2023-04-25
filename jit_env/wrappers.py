@@ -116,6 +116,19 @@ class Vmap(_core.Wrapper):
         return super().render(state_0)
 
 
+class StopGradient(_core.Wrapper):
+    """Wrapper to cancel out all Env-dependent gradients."""
+
+    def step(
+            self,
+            state: _core.State,
+            action: _core.Action
+    ) -> tuple[_core.State, _core.TimeStep]:
+        return _jax.tree_map(
+            _jax.lax.stop_gradient, super().step(state, action)
+        )
+
+
 class BatchSpecMixin:
     """Provide a fixed-size batched environment-spec as a MixIn."""
     env: _core.Environment
