@@ -1,7 +1,10 @@
 from __future__ import annotations
 import typing
 
+import gymnasium as gym
+
 import dm_env
+
 import jaxtyping
 import pytest
 
@@ -29,6 +32,20 @@ def to_dm_wrapper(dummy_env: jit_env.Environment):
 def to_dm_spec(dummy_env: jit_env.Environment):
     out = jit_env.compat.make_deepmind_wrapper()
     assert out is not None, "Cannot run dm_env test with module missing!"
+    return out[1]
+
+
+@pytest.fixture
+def to_gym_wrapper(dummy_env: jit_env.Environment):
+    out = jit_env.compat.make_gymnasium_wrapper()
+    assert out is not None, "Cannot run gym test with module missing!"
+    return out[0]
+
+
+@pytest.fixture
+def to_gym_space(dummy_env: jit_env.Environment):
+    out = jit_env.compat.make_gymnasium_wrapper()
+    assert out is not None, "Cannot run gym test with module missing!"
     return out[1]
 
 
@@ -126,3 +143,75 @@ class TestDMEnvConversion:
         env_spec.observations.validate(step.observation)
         env_spec.rewards.validate(step.reward)
         env_spec.discounts.validate(step.discount)
+
+
+class TestGymEnvConversion:
+
+    @pytest.mark.usefixtures('to_gym_space')
+    @pytest.mark.parametrize(
+        'in_spec, gym_space', [
+            (
+                    jit_env.specs.Tuple(
+                        jit_specs.DiscreteArray(3, name='number'),
+                        jit_specs.BoundedArray((), jnp.float32, 0.0, 1.0),
+                        jit_specs.Array((), jnp.float32)
+                    ),
+                    gym.spaces.Tuple((
+                            gym.spaces.Discrete(3),
+                            gym.spaces.Box(0.0, 1.0, (), np.float32),
+                            gym.spaces.Box(
+                                float('-inf'), float('inf'), (), np.float32
+                            )
+                    ))
+            ),
+            (
+                    jit_env.specs.Dict(
+                        a=jit_specs.DiscreteArray(3, name='number'),
+                        b=jit_specs.Array((), jnp.float32)
+                    ),
+                    gym.spaces.Dict({
+                        'a': gym.spaces.Discrete(3),
+                        'b': gym.spaces.Box(
+                            float('-inf'), float('inf'), (), np.float32
+                        )
+                    })
+            ),
+            (
+                    jit_specs.DiscreteArray(
+                        jnp.ones((3,), jnp.int32), name='num'
+                    ),
+                    gym.spaces.MultiDiscrete(np.ones(3), np.int32)
+            )
+        ]
+    )
+    def test_spec_conversion(
+            self,
+            to_gym_space: typing.Callable[
+                [jit_specs.Spec], gym.Space
+            ],
+            in_spec: jit_specs.Spec,
+            gym_space: gym.Space
+    ):
+        out_space = to_gym_space(in_spec)
+
+        _ = jax.tree_map(lambda a, b: type(a) == type(b), out_space, gym_space)
+        _ = jax.tree_map(lambda a, b: a.name == b.name, out_space, gym_space)
+        _ = jax.tree_map(lambda a, b: a.shape == b.shape, out_space, gym_space)
+        _ = jax.tree_map(lambda a, b: a.dtype == b.dtype, out_space, gym_space)
+
+        samples = jax.tree_map(lambda s: s.generate_value(), out_space)
+        dm_samples = jax.tree_map(lambda s: s.generate_value(), gym_space)
+
+        chex.assert_trees_all_equal(samples, dm_samples, ignore_nones=True)
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            samples, dm_samples, ignore_nones=True
+        )
+
+    @pytest.mark.usefixtures('dummy_env')
+    @pytest.mark.usefixtures('to_gym_wrapper')
+    def test_wrapper(
+            self,
+            dummy_env: jit_env.Environment,
+            to_gym_wrapper: type
+    ):
+        my_gym_env = to_gym_wrapper(dummy_env, 0)
