@@ -278,5 +278,27 @@ class TestGymEnvConversion:
             dummy_env: jit_env.Environment,
             to_gym_wrapper: type
     ):
-        pass
-        # my_gym_env = to_gym_wrapper(dummy_env, 0)
+        my_gym_env: gym.Env = to_gym_wrapper(dummy_env, 0)
+
+        env_spec = jit_specs.make_environment_spec(dummy_env)
+
+        observation, info = my_gym_env.reset()
+        env_spec.observations.validate(observation)
+
+        action = my_gym_env.action_space.sample() * 0.0
+        env_spec.actions.validate(action)
+
+        observation, reward, last, stopped, info = my_gym_env.step(action)
+
+        assert not last
+        assert not stopped
+
+        env_spec.observations.validate(observation)
+        env_spec.rewards.validate(reward)
+
+        observation, reward, last, stopped, info = my_gym_env.step(None)
+
+        assert last
+
+        env_spec.observations.validate(observation)
+        env_spec.rewards.validate(reward)

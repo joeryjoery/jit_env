@@ -143,7 +143,23 @@ def test_environment_spec(dummy_env):
                         c=specs.DiscreteArray(10)
                     ))
                 )
+        ),
+        (
+                specs.Tree(
+                    leaves=[
+                        specs.Array((), jnp.float32),
+                        specs.DiscreteArray(5),
+                        specs.DiscreteArray(10),
+                    ],
+                    structure=jax.tree_util.tree_structure(
+                        (0, dict(a=dict(b=(0, [0]))))
+                    )
+                ),
+                (specs.Array((), jnp.float32), dict(a=dict(
+                    b=(specs.DiscreteArray(5), [specs.DiscreteArray(10)])
+                )))
         )
+
     ]
 )
 def test_unpack_spec(in_spec: specs.Spec, expected_tree: PyTree[specs.Spec]):
