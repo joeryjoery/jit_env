@@ -8,6 +8,8 @@ import chex
 import jax
 from jax import numpy as jnp
 
+from jaxtyping import PyTree
+
 from jit_env import specs
 
 INT_SIZE: int = 3
@@ -108,6 +110,17 @@ def test_environment_spec(dummy_env):
     _ = jax.tree_map(check_spec, env_spec.observations, o)
     _ = jax.tree_map(check_spec, env_spec.discounts, d)
     _ = jax.tree_map(check_spec, env_spec.actions, a)
+
+
+# @pytest.mark.parametrize(
+#     'in_spec, expected_tree', [
+#         (
+#
+#         ),
+#     ]
+# )
+# def test_unpack_spec(in_spec: specs.Spec, expected_tree: PyTree[specs.Spec]):
+#     pass
 
 
 class TestTree:

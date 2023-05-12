@@ -469,6 +469,7 @@ class Tree(CompositeSpec):
         return _tree_util.tree_unflatten(self.treedef, values)
 
 
+@_tree_util.register_pytree_node_class
 class Tuple(Tree):
     """Overrides Tree as a Tuple PyTree Structure."""
     __slots__ = ()
@@ -490,11 +491,25 @@ class Tuple(Tree):
 
         super().__init__(
             list(var_specs),
-            _tree_util.tree_structure(var_specs),
+            _tree_util.tree_structure((0,) * len(var_specs)),
             name
         )
 
+    def tree_flatten(
+            self
+    ) -> tuple[_typing.Sequence[Spec], tuple[_tree_util.PyTreeDef, str]]:
+        return self.leave_specs, (self.treedef, self.name)
 
+    @classmethod
+    def tree_unflatten(
+            cls: _typing.Type[Tuple],
+            aux: tuple[_tree_util.PyTreeDef, str],
+            children: _typing.Sequence[Spec]
+    ) -> Tuple:
+        return cls(*children, name=aux[-1])
+
+
+@_tree_util.register_pytree_node_class
 class Dict(Tree):
     """Overrides Tree as a Dictionary PyTree Structure."""
     __slots__ = ()
@@ -531,9 +546,23 @@ class Dict(Tree):
 
         super().__init__(
             list(full_spec.values()),
-            _tree_util.tree_structure(full_spec),
+            _tree_util.tree_structure({k: 0 for k in full_spec.keys()}),
             name=name
         )
+
+    def tree_flatten(
+            self
+    ) -> tuple[_typing.Sequence[Spec], tuple[_tree_util.PyTreeDef, str]]:
+        return self.leave_specs, (self.treedef, self.name)
+
+    @classmethod
+    def tree_unflatten(
+            cls: _typing.Type[Dict],
+            aux: tuple[_tree_util.PyTreeDef, str],
+            children: _typing.Sequence[Spec]
+    ) -> Dict:
+        tree_dict = _jax.tree_util.tree_unflatten(aux[0], children)
+        return cls(tree_dict, name=aux[-1])
 
 
 class Batched(CompositeSpec, _typing.Generic[_T]):
@@ -678,7 +707,11 @@ def unpack_spec(
 ) -> Spec:
     """Recursively unpack composite specs to a tree of Primitive Specs."""
     if isinstance(spec, CompositeSpec):
-        return _jax.tree_map(unpack_spec, spec.as_spec_struct())
+        unpacked = spec.as_spec_struct()
+        return _jax.tree_map(
+            unpack_spec, unpacked,
+            is_leaf=lambda z: z is not unpacked
+        )
     return spec
 
 

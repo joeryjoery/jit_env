@@ -13,6 +13,7 @@ The recommended usage is as follows::
 """
 from __future__ import annotations as _annotations
 from dataclasses import replace as _replace
+from collections.abc import Mapping, Sequence
 
 import typing as _typing
 
@@ -133,40 +134,55 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
 def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
     try:
         import gymnasium as gym
+        import numpy as np
     except ModuleNotFoundError:  # pragma: no cover
         return None
 
     def specs_to_gym_space(spec: _specs.Spec) -> gym.Space:
-        """Convert a compatible `jit_env` spec into a gym space."""
+        """Convert a compatible `jit_env` spec into a gym space.
 
+        Note that jax DTypes convert to numpy DTypes in NDArray creation.
+        """
         if isinstance(spec, _specs.DiscreteArray):
             if not spec.shape:
-                return gym.spaces.Discrete(int(spec.num_values))
+                return gym.spaces.Discrete(
+                    int(spec.num_values)
+                )
             else:
-                return gym.spaces.MultiDiscrete(spec.num_values)
+                return gym.spaces.MultiDiscrete(
+                    np.asarray(spec.num_values, spec.dtype),
+                    spec.dtype
+                )
 
         elif isinstance(spec, _specs.BoundedArray):
             return gym.spaces.Box(
-                spec.minimum, spec.maximum, spec.shape, spec.dtype
+                np.asarray(spec.minimum, spec.dtype),
+                np.asarray(spec.maximum, spec.dtype),
+                spec.shape,
+                spec.dtype
             )
         elif isinstance(spec, _specs.Array):
-            return gym.spaces.Box(
-                float('-inf'), float('inf'), spec.shape, spec.dtype
-            )
-        elif isinstance(spec, _specs.Dict):
-            return gym.spaces.Dict(
-                {k: specs_to_gym_space(v) for k, v in spec.as_spec_struct()}
-            )
-        elif isinstance(spec, _specs.Tuple):
-            return gym.spaces.Tuple(spec.as_spec_struct())
+            with np.errstate(invalid='ignore'):  # suppresses `int(np.inf)`
+                return gym.spaces.Box(
+                    np.broadcast_to(-np.inf, spec.shape).astype(spec.dtype),
+                    np.broadcast_to(np.inf, spec.shape).astype(spec.dtype),
+                    spec.shape,
+                    spec.dtype
+                )
+        else:
+            if isinstance(spec, _specs.Tree):
+                unpacked = spec.as_spec_struct()
+                out = _jax.tree_map(
+                    specs_to_gym_space, unpacked,
+                    is_leaf=lambda z: z is not unpacked
+                )
+            else:
+                out = _jax.tree_map(specs_to_gym_space, spec)
 
-        elif isinstance(spec, _specs.Tree):
-            out = _jax.tree_map(specs_to_gym_space, spec.as_spec_struct())
-
-            if isinstance(out, _typing.Mapping):
-                return specs_to_gym_space(_specs.Dict(**out))
-            if isinstance(out, _typing.Sequence):
-                return specs_to_gym_space(_specs.Tuple(*out))
+            if isinstance(out, Mapping):
+                return gym.spaces.Dict(out)
+            if isinstance(out, Sequence):
+                return gym.spaces.Tuple(out)
 
         raise NotImplementedError(
             f"Conversion of {spec.__class__.__name__} is not supported!"
@@ -183,9 +199,7 @@ def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
 
             self.env = env
 
-            self._seed(seed)
             self.rng: _jax.random.KeyArray = _jax.random.PRNGKey(seed)
-
             self.env_state, _ = env.reset(self.rng)
 
             self.metadata.update({
@@ -230,7 +244,6 @@ def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
                 self,
                 *,
                 seed: int | None = None,
-                return_info: bool = False,
                 options: dict | None = None
         ) -> tuple[_core.Observation, dict]:
             """Reset environment, update parameters and seed if provided"""
@@ -238,8 +251,8 @@ def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
                 self._seed(seed)
 
             self.rng, reset_key = _jax.random.split(self.rng)
-
             self.env_state, step = self.env.reset(reset_key)
+
             return step.observation, step.extras
 
         def render(
