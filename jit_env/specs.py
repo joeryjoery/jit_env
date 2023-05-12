@@ -457,10 +457,11 @@ class Tree(CompositeSpec):
             self,
             value: _jxtype.PyTree[_jxtype.ArrayLike | None]
     ) -> _jxtype.PyTree[_jxtype.ArrayLike | None]:
-        return _jax.tree_map(
-            lambda s, v: s.validate(v),
-            self.as_spec_struct(), value
-        )
+        leaf_values = self.treedef.flatten_up_to(value)
+        leaf_validated = [
+            s.validate(v) for s, v in zip(self.leave_specs, leaf_values)
+        ]
+        return self.treedef.unflatten(leaf_validated)
 
     def generate_value(
             self
