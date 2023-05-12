@@ -1,6 +1,6 @@
 ![Run Tox Tests](https://github.com/joeryjoery/jit_env/actions/workflows/tests.yml/badge.svg)
 ![Python Version](https://img.shields.io/badge/Python-3.9%20%7C%203.10%20%7C%203.11-blue)
-![Package Version](https://img.shields.io/badge/jit__env-0.1.3-blue)
+![Package Version](https://img.shields.io/badge/jit__env-0.1.4-blue)
 # `jit_env`: A Jax Compatible RL Environment API
 `jit_env` is a library that aims to adhere closely to the `dm_env` interface
 while allowing for `jax` transformations inside Environment implementations
@@ -24,7 +24,7 @@ For a more thorough review of the semantics, please refer to the [dm-env](https:
 wiki and compare our implementation of `jit_env.Environment` with `dm_env.Environment` and the conversion as given in [`compat.py`](https://github.com/joeryjoery/jit_env/blob/main/jit_env/compat.py).
 
 ## Installation
-`jit_env` can be installed with:
+`jit_env` can be installed with (it is recommended to install `jax` first):
 
 `python -m pip install jit-env`
 
@@ -82,3 +82,4 @@ This library was heavily inspired by the following libraries:
 - dm-env: [https://github.com/deepmind/dm_env](https://github.com/deepmind/dm_env)
 - jumanji: [https://github.com/instadeepai/jumanji](https://github.com/instadeepai/jumanji)
 - gymnax: [https://github.com/RobertTLange/gymnax](https://github.com/RobertTLange/gymnax)
+- gymnasium: [https://github.com/Farama-Foundation/Gymnasium](https://github.com/Farama-Foundation/Gymnasium)
