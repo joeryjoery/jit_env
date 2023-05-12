@@ -6,3 +6,4 @@ tox>=4.4.11
 flake8>=6.0.0
 mypy>=1.2.0
 dm_env>=1.5
+gymnasium>=0.28.0

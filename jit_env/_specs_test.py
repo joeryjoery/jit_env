@@ -8,6 +8,8 @@ import chex
 import jax
 from jax import numpy as jnp
 
+from jaxtyping import PyTree
+
 from jit_env import specs
 
 INT_SIZE: int = 3
@@ -108,6 +110,77 @@ def test_environment_spec(dummy_env):
     _ = jax.tree_map(check_spec, env_spec.observations, o)
     _ = jax.tree_map(check_spec, env_spec.discounts, d)
     _ = jax.tree_map(check_spec, env_spec.actions, a)
+
+
+@pytest.mark.parametrize(
+    'in_spec, expected_tree', [
+        (
+                specs.Tuple(
+                    specs.Tuple(
+                        specs.Tuple(
+                            specs.Array((), jnp.float32)
+                        )
+                    )
+                ),
+                (((specs.Array((), jnp.float32),),),)
+        ),
+        (
+                specs.Dict(
+                    a=specs.Tuple(
+                        specs.DiscreteArray(5)
+                    ),
+                    b=specs.Tree(
+                        leaves=[
+                            specs.Array((), jnp.float32),
+                            specs.DiscreteArray(10)
+                        ],
+                        structure=jax.tree_util.tree_structure((0, dict(c=0)))
+                    )
+                ),
+                dict(
+                    a=(specs.DiscreteArray(5),),
+                    b=(specs.Array((), jnp.float32), dict(
+                        c=specs.DiscreteArray(10)
+                    ))
+                )
+        ),
+        (
+                specs.Tree(
+                    leaves=[
+                        specs.Array((), jnp.float32),
+                        specs.DiscreteArray(5),
+                        specs.DiscreteArray(10),
+                    ],
+                    structure=jax.tree_util.tree_structure(
+                        (0, dict(a=dict(b=(0, [0]))))
+                    )
+                ),
+                (specs.Array((), jnp.float32), dict(a=dict(
+                    b=(specs.DiscreteArray(5), [specs.DiscreteArray(10)])
+                )))
+        )
+
+    ]
+)
+def test_unpack_spec(in_spec: specs.Spec, expected_tree: PyTree[specs.Spec]):
+    unpacked = specs.unpack_spec(in_spec)
+    chex.assert_trees_all_equal_structs(unpacked, expected_tree)
+
+    sample_normal = in_spec.generate_value()
+    sample_tree = jax.tree_map(lambda s: s.generate_value(), unpacked)
+    sample_spec = specs.unpack_spec(
+        jax.tree_map(lambda s: s.generate_value(), in_spec)
+    )
+
+    in_spec.validate(sample_tree)
+    in_spec.validate(sample_spec)
+
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        sample_normal, sample_tree, ignore_nones=True
+    )
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        sample_normal, sample_spec, ignore_nones=True
+    )
 
 
 class TestTree:
@@ -247,9 +320,10 @@ class TestBatched:
     def test_struct(self, batch_spec: specs.Batched):
         out_dict = batch_spec.generate_value()
 
-        batched_specs = batch_spec.as_spec_struct()
+        unpacked = batch_spec.as_spec_struct()
         new_dict = jax.tree_map(
-            lambda s: s.generate_value(), batched_specs
+            lambda s: s.generate_value(), unpacked,
+            is_leaf=lambda s: isinstance(s, specs.CompositeSpec)
         )
 
         chex.assert_trees_all_equal(out_dict, new_dict)

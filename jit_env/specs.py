@@ -140,7 +140,7 @@ class PrimitiveSpec(Spec[_T], _typing.Generic[_T], metaclass=_abc.ABCMeta):
         self._dtype = _jnp.zeros((), dtype).dtype  # get uniform `dtype` type
 
     @property
-    def shape(self) -> int | _typing.Sequence[int]:
+    def shape(self) -> _typing.Sequence[int]:
         return self._shape
 
     @property
@@ -457,10 +457,11 @@ class Tree(CompositeSpec):
             self,
             value: _jxtype.PyTree[_jxtype.ArrayLike | None]
     ) -> _jxtype.PyTree[_jxtype.ArrayLike | None]:
-        return _jax.tree_map(
-            lambda s, v: s.validate(v),
-            self.as_spec_struct(), value
-        )
+        leaf_values = self.treedef.flatten_up_to(value)
+        leaf_validated = [
+            s.validate(v) for s, v in zip(self.leave_specs, leaf_values)
+        ]
+        return self.treedef.unflatten(leaf_validated)
 
     def generate_value(
             self
@@ -469,6 +470,7 @@ class Tree(CompositeSpec):
         return _tree_util.tree_unflatten(self.treedef, values)
 
 
+@_tree_util.register_pytree_node_class
 class Tuple(Tree):
     """Overrides Tree as a Tuple PyTree Structure."""
     __slots__ = ()
@@ -490,11 +492,20 @@ class Tuple(Tree):
 
         super().__init__(
             list(var_specs),
-            _tree_util.tree_structure(var_specs),
+            _tree_util.tree_structure((0,) * len(var_specs)),
             name
         )
 
+    @classmethod
+    def tree_unflatten(
+            cls: _typing.Type[Tuple],
+            aux: tuple[_tree_util.PyTreeDef, str],
+            children: _typing.Sequence[Spec]
+    ) -> Tuple:
+        return cls(*children, name=aux[-1])
 
+
+@_tree_util.register_pytree_node_class
 class Dict(Tree):
     """Overrides Tree as a Dictionary PyTree Structure."""
     __slots__ = ()
@@ -531,9 +542,18 @@ class Dict(Tree):
 
         super().__init__(
             list(full_spec.values()),
-            _tree_util.tree_structure(full_spec),
+            _tree_util.tree_structure({k: 0 for k in full_spec.keys()}),
             name=name
         )
+
+    @classmethod
+    def tree_unflatten(
+            cls: _typing.Type[Dict],
+            aux: tuple[_tree_util.PyTreeDef, str],
+            children: _typing.Sequence[Spec]
+    ) -> Dict:
+        tree_dict = _jax.tree_util.tree_unflatten(aux[0], children)
+        return cls(tree_dict, name=aux[-1])
 
 
 class Batched(CompositeSpec, _typing.Generic[_T]):
@@ -584,9 +604,7 @@ class Batched(CompositeSpec, _typing.Generic[_T]):
             base_spec = base_spec.as_spec_struct()
 
         def reshape(s: Spec):
-            if isinstance(s, PrimitiveSpec):
-                return reshape_spec(s, prepend=(self.num,))
-            return Batched(s, self.num)
+            return reshape_spec(s, prepend=(self.num,))
 
         return _jax.tree_map(reshape, base_spec)
 
@@ -678,7 +696,11 @@ def unpack_spec(
 ) -> Spec:
     """Recursively unpack composite specs to a tree of Primitive Specs."""
     if isinstance(spec, CompositeSpec):
-        return _jax.tree_map(unpack_spec, spec.as_spec_struct())
+        unpacked = spec.as_spec_struct()
+        return _jax.tree_map(
+            unpack_spec, unpacked,
+            is_leaf=lambda z: z is not unpacked
+        )
     return spec
 
 

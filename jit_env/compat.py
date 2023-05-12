@@ -12,6 +12,8 @@ The recommended usage is as follows::
         my_dm_env = to_dm(env)
 """
 from __future__ import annotations as _annotations
+from collections.abc import Mapping, Sequence
+
 import typing as _typing
 
 import jax as _jax
@@ -128,5 +130,131 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
     return ToDeepmindEnv, specs_to_dm_specs
 
 
-def make_gymnasium_wrapper() -> None | tuple[_typing.Callable, type]:
-    ...  # pragma: no cover  # TODO
+def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
+    try:
+        import gymnasium as gym
+        import numpy as np
+    except ModuleNotFoundError:  # pragma: no cover
+        return None
+
+    def specs_to_gym_space(spec: _specs.Spec) -> gym.Space:
+        """Convert a compatible `jit_env` spec into a gym space.
+
+        Note that jax DTypes convert to numpy DTypes in NDArray creation.
+        """
+        if isinstance(spec, _specs.DiscreteArray):
+            if not spec.shape:
+                return gym.spaces.Discrete(
+                    int(spec.num_values)
+                )
+            else:
+                return gym.spaces.MultiDiscrete(
+                    np.asarray(spec.num_values, spec.dtype),
+                    spec.dtype
+                )
+
+        elif isinstance(spec, _specs.BoundedArray):
+            return gym.spaces.Box(
+                np.asarray(spec.minimum, spec.dtype),
+                np.asarray(spec.maximum, spec.dtype),
+                spec.shape,
+                spec.dtype
+            )
+        elif isinstance(spec, _specs.Array):
+            with np.errstate(invalid='ignore'):  # suppresses `int(np.inf)`
+                return gym.spaces.Box(
+                    np.broadcast_to(-np.inf, spec.shape).astype(spec.dtype),
+                    np.broadcast_to(np.inf, spec.shape).astype(spec.dtype),
+                    spec.shape,
+                    spec.dtype
+                )
+        else:
+            if isinstance(spec, _specs.Tree):
+                unpacked = spec.as_spec_struct()
+                out = _jax.tree_map(
+                    specs_to_gym_space, unpacked,
+                    is_leaf=lambda z: z is not unpacked
+                )
+            else:
+                out = _jax.tree_map(specs_to_gym_space, spec)
+
+            if isinstance(out, Mapping):
+                return gym.spaces.Dict(dict(out))
+            if isinstance(out, Sequence):
+                return gym.spaces.Tuple(tuple(out))
+
+        raise NotImplementedError(
+            f"Conversion of {spec.__class__.__name__} is not supported!"
+        )
+
+    class ToGym(gym.Env[_core.Observation, _core.Action]):
+
+        def __init__(
+                self,
+                env: _core.Environment,
+                seed: int = 0,
+        ):
+            super().__init__()
+
+            self.env = env
+
+            self.rng: _jax.random.KeyArray = _jax.random.PRNGKey(seed)
+            self.env_state, _ = env.reset(self.rng)
+
+            self.metadata.update({
+                "name": str(env), "render_modes": ["human", "rgb_array"]
+            })
+
+        @property
+        def action_space(self):
+            return specs_to_gym_space(
+                self.env.action_spec()
+            )
+
+        @property
+        def observation_space(self):
+            return specs_to_gym_space(
+                self.env.observation_spec()
+            )
+
+        def _seed(self, seed: int = 0):
+            """Set RNG seed (or use 0)"""
+            self.rng = _jax.random.PRNGKey(seed)
+
+        def step(
+                self, action: _core.Action
+        ) -> tuple[
+            _core.Observation, gym.core.SupportsFloat, bool, bool, dict
+        ]:
+            """Step environment, follow new step API"""
+            self.env_state, step = self.env.step(self.env_state, action)
+
+            return (
+                step.observation,
+                np.asarray(step.reward),
+                bool(step.last()),
+                bool(step.last()),
+                step.extras or {}
+            )
+
+        def reset(
+                self,
+                *,
+                seed: int | None = None,
+                options: dict | None = None
+        ) -> tuple[_core.Observation, dict]:
+            """Reset environment, update parameters and seed if provided"""
+            if seed is not None:
+                self._seed(seed)
+
+            self.rng, reset_key = _jax.random.split(self.rng)
+            self.env_state, step = self.env.reset(reset_key)
+
+            return step.observation, (step.extras or {})
+
+        def render(
+                self, mode: str = "human"
+        ) -> gym.core.RenderFrame | list[gym.core.RenderFrame] | None:
+            return self.env.render(self.env_state)  # pragma: no cover
+
+    return ToGym, specs_to_gym_space
