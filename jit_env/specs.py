@@ -140,7 +140,7 @@ class PrimitiveSpec(Spec[_T], _typing.Generic[_T], metaclass=_abc.ABCMeta):
         self._dtype = _jnp.zeros((), dtype).dtype  # get uniform `dtype` type
 
     @property
-    def shape(self) -> int | _typing.Sequence[int]:
+    def shape(self) -> _typing.Sequence[int]:
         return self._shape
 
     @property
@@ -496,11 +496,6 @@ class Tuple(Tree):
             name
         )
 
-    def tree_flatten(
-            self
-    ) -> tuple[_typing.Sequence[Spec], tuple[_tree_util.PyTreeDef, str]]:
-        return self.leave_specs, (self.treedef, self.name)
-
     @classmethod
     def tree_unflatten(
             cls: _typing.Type[Tuple],
@@ -550,11 +545,6 @@ class Dict(Tree):
             _tree_util.tree_structure({k: 0 for k in full_spec.keys()}),
             name=name
         )
-
-    def tree_flatten(
-            self
-    ) -> tuple[_typing.Sequence[Spec], tuple[_tree_util.PyTreeDef, str]]:
-        return self.leave_specs, (self.treedef, self.name)
 
     @classmethod
     def tree_unflatten(
@@ -614,9 +604,7 @@ class Batched(CompositeSpec, _typing.Generic[_T]):
             base_spec = base_spec.as_spec_struct()
 
         def reshape(s: Spec):
-            if isinstance(s, PrimitiveSpec):
-                return reshape_spec(s, prepend=(self.num,))
-            return Batched(s, self.num)
+            return reshape_spec(s, prepend=(self.num,))
 
         return _jax.tree_map(reshape, base_spec)
 

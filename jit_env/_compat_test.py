@@ -148,6 +148,12 @@ class TestDMEnvConversion:
 
 class TestGymEnvConversion:
 
+    def test_wrong_spec(
+            self, to_gym_space: typing.Callable[[jit_specs.Spec], gym.Space]
+    ):
+        with pytest.raises(NotImplementedError):
+            _ = to_gym_space(None)  # type: ignore
+
     @pytest.mark.usefixtures('to_gym_space')
     @pytest.mark.parametrize(
         'in_spec, gym_space', [
@@ -282,7 +288,10 @@ class TestGymEnvConversion:
 
         env_spec = jit_specs.make_environment_spec(dummy_env)
 
-        observation, info = my_gym_env.reset()
+        env_spec.actions.validate(my_gym_env.action_space.sample())
+        env_spec.observations.validate(my_gym_env.observation_space.sample())
+
+        observation, info = my_gym_env.reset(seed=123)
         env_spec.observations.validate(observation)
 
         action = my_gym_env.action_space.sample() * 0.0

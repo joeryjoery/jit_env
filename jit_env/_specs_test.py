@@ -168,10 +168,18 @@ def test_unpack_spec(in_spec: specs.Spec, expected_tree: PyTree[specs.Spec]):
 
     sample_normal = in_spec.generate_value()
     sample_tree = jax.tree_map(lambda s: s.generate_value(), unpacked)
+    sample_spec = specs.unpack_spec(
+        jax.tree_map(lambda s: s.generate_value(), in_spec)
+    )
 
     in_spec.validate(sample_tree)
+    in_spec.validate(sample_spec)
+
     chex.assert_trees_all_equal_shapes_and_dtypes(
         sample_normal, sample_tree, ignore_nones=True
+    )
+    chex.assert_trees_all_equal_shapes_and_dtypes(
+        sample_normal, sample_spec, ignore_nones=True
     )
 
 
@@ -312,9 +320,10 @@ class TestBatched:
     def test_struct(self, batch_spec: specs.Batched):
         out_dict = batch_spec.generate_value()
 
-        unpacked = specs.unpack_spec(batch_spec)
+        unpacked = batch_spec.as_spec_struct()
         new_dict = jax.tree_map(
-            lambda s: s.generate_value(), unpacked
+            lambda s: s.generate_value(), unpacked,
+            is_leaf=lambda s: isinstance(s, specs.CompositeSpec)
         )
 
         chex.assert_trees_all_equal(out_dict, new_dict)

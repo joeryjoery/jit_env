@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING
 from dataclasses import replace
 
 import jax
@@ -21,7 +21,7 @@ else:
 @dataclass(frozen=True)
 class MyState:
     key: jax.random.KeyArray
-    count: jxtype.Int32[jxtype.Array, '']  # type: ignore
+    count: jxtype.Int32[jxtype.Array, '']
 
 
 class CountingEnv(jit_env.Environment):
@@ -33,20 +33,21 @@ class CountingEnv(jit_env.Environment):
     """
 
     def __init__(self, maximum: int | jxtype.Integer[jxtype.Array, '']):
+        super().__init__()
         self.maximum = maximum
 
     def reset(
             self,
             key: jax.random.KeyArray
-    ) -> tuple[jit_env.State, jit_env.TimeStep]:
+    ) -> tuple[MyState, jit_env.TimeStep]:
         state = MyState(key=key, count=jnp.zeros((), jnp.int32))
         return state, jit_env.restart(state.count, shape=())
 
     def step(
             self,
-            state: jit_env.State,
+            state: MyState,
             action: jit_env.Action
-    ) -> tuple[jit_env.State, jit_env.TimeStep]:
+    ) -> tuple[MyState, jit_env.TimeStep]:
         state = replace(state, count=state.count + action)
 
         step = jax.lax.cond(
@@ -72,6 +73,3 @@ class CountingEnv(jit_env.Environment):
 
     def action_spec(self) -> specs.Spec:
         return specs.DiscreteArray(self.maximum, jnp.int32, 'action')
-
-    def render(self, state: jit_env.State) -> Any:
-        return  # pragma: no cover

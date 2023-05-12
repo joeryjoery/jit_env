@@ -12,7 +12,6 @@ The recommended usage is as follows::
         my_dm_env = to_dm(env)
 """
 from __future__ import annotations as _annotations
-from dataclasses import replace as _replace
 from collections.abc import Mapping, Sequence
 
 import typing as _typing
@@ -180,9 +179,9 @@ def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
                 out = _jax.tree_map(specs_to_gym_space, spec)
 
             if isinstance(out, Mapping):
-                return gym.spaces.Dict(out)
+                return gym.spaces.Dict(dict(out))
             if isinstance(out, Sequence):
-                return gym.spaces.Tuple(out)
+                return gym.spaces.Tuple(tuple(out))
 
         raise NotImplementedError(
             f"Conversion of {spec.__class__.__name__} is not supported!"
@@ -221,23 +220,21 @@ def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
         def _seed(self, seed: int = 0):
             """Set RNG seed (or use 0)"""
             self.rng = _jax.random.PRNGKey(seed)
-            self.env_state = _replace(self.env_state, key=self.rng)
 
         def step(
                 self, action: _core.Action
-        ) -> _typing.Union[
-            tuple[_core.Observation, float, bool, bool, dict],
-            tuple[_core.Observation, float, bool, dict],
+        ) -> tuple[
+            _core.Observation, gym.core.SupportsFloat, bool, bool, dict
         ]:
             """Step environment, follow new step API"""
             self.env_state, step = self.env.step(self.env_state, action)
 
             return (
                 step.observation,
-                step.reward,
+                np.asarray(step.reward),
                 bool(step.last()),
                 bool(step.last()),
-                step.extras
+                step.extras or {}
             )
 
         def reset(
@@ -253,11 +250,11 @@ def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
             self.rng, reset_key = _jax.random.split(self.rng)
             self.env_state, step = self.env.reset(reset_key)
 
-            return step.observation, step.extras
+            return step.observation, (step.extras or {})
 
         def render(
-                self, mode="human"
-        ) -> _typing.Sequence[gym.core.RenderFrame] | None:
-            return self.env.render(self.env_state)
+                self, mode: str = "human"
+        ) -> gym.core.RenderFrame | list[gym.core.RenderFrame] | None:
+            return self.env.render(self.env_state)  # pragma: no cover
 
     return ToGym, specs_to_gym_space
