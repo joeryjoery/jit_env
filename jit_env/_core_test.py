@@ -55,25 +55,25 @@ def test_empty_wrapper(dummy_env: jit_env.Environment):
     _ = jax.tree_map(lambda a, b: a.validate(b), spec, wrap_samples)
     _ = jax.tree_map(lambda a, b: a.validate(b), wrapped_spec, spec_samples)
 
-    chex.assert_trees_all_equal(spec_samples, wrap_samples, ignore_nones=True)
+    chex.assert_trees_all_equal(spec_samples, wrap_samples)
     chex.assert_trees_all_equal_shapes_and_dtypes(
-        spec_samples, wrap_samples, ignore_nones=True
+        spec_samples, wrap_samples
     )
 
     out = dummy_env.reset(jax.random.PRNGKey(0))
     wrap_out = wrapped.reset(jax.random.PRNGKey(0))
 
-    chex.assert_trees_all_equal(out, wrap_out, ignore_nones=True)
+    chex.assert_trees_all_equal(out, wrap_out)
     chex.assert_trees_all_equal_shapes_and_dtypes(
-        out, wrap_out, ignore_nones=True
+        out, wrap_out
     )
 
     out = dummy_env.step(out[0], spec.actions.generate_value())
     wrap_out = wrapped.step(wrap_out[0], wrapped_spec.actions.generate_value())
 
-    chex.assert_trees_all_equal(out, wrap_out, ignore_nones=True)
+    chex.assert_trees_all_equal(out, wrap_out)
     chex.assert_trees_all_equal_shapes_and_dtypes(
-        out, wrap_out, ignore_nones=True
+        out, wrap_out
     )
 
 

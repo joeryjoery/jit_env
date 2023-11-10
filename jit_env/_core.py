@@ -45,6 +45,8 @@ class StateProtocol(Protocol):
 # The following should all be valid Jax types
 Action = TypeVar("Action")
 Observation = TypeVar("Observation")
+Reward = TypeVar("Reward")
+Discount = TypeVar("Discount")
 State = TypeVar("State", bound="StateProtocol")
 
 
