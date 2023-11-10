@@ -97,7 +97,7 @@ class TestDMEnvConversion:
     ):
         out_spec = to_dm_spec(in_spec)
 
-        _ = jax.tree_map(lambda a, b: type(a) == type(b), out_spec, dm_spec)
+        _ = jax.tree_map(lambda a, b: type(a) is type(b), out_spec, dm_spec)
         _ = jax.tree_map(lambda a, b: a.name == b.name, out_spec, dm_spec)
         _ = jax.tree_map(lambda a, b: a.shape == b.shape, out_spec, dm_spec)
         _ = jax.tree_map(lambda a, b: a.dtype == b.dtype, out_spec, dm_spec)
@@ -246,7 +246,7 @@ class TestGymEnvConversion:
         """
         out_space = to_gym_space(in_spec)
 
-        _ = jax.tree_map(lambda a, b: type(a) == type(b), out_space, gym_space)
+        _ = jax.tree_map(lambda a, b: type(a) is type(b), out_space, gym_space)
         _ = jax.tree_map(lambda a, b: a.shape == b.shape, out_space, gym_space)
         _ = jax.tree_map(lambda a, b: a.dtype == b.dtype, out_space, gym_space)
 
