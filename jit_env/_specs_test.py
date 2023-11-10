@@ -176,10 +176,10 @@ def test_unpack_spec(in_spec: specs.Spec, expected_tree: PyTree[specs.Spec]):
     in_spec.validate(sample_spec)
 
     chex.assert_trees_all_equal_shapes_and_dtypes(
-        sample_normal, sample_tree, ignore_nones=True
+        sample_normal, sample_tree
     )
     chex.assert_trees_all_equal_shapes_and_dtypes(
-        sample_normal, sample_spec, ignore_nones=True
+        sample_normal, sample_spec
     )
 
 

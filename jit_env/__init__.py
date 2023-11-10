@@ -9,7 +9,9 @@ from jit_env import _core
 from jit_env._core import (
     Action as Action,
     State as State,
-    Observation as Observation
+    Observation as Observation,
+    RewardT as Reward,
+    DiscountT as Discount
 )
 
 from jit_env import specs

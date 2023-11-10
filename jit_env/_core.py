@@ -44,8 +44,13 @@ class StateProtocol(Protocol):
 
 # The following should all be valid Jax types
 Action = TypeVar("Action")
+
 Observation = TypeVar("Observation")
-State = TypeVar("State", bound="StateProtocol")
+StepT = TypeVar("StepT", bound=Int8[Array, ''])
+RewardT = TypeVar("RewardT", bound=PyTree[ArrayLike])
+DiscountT = TypeVar("DiscountT", bound=PyTree[ArrayLike])
+
+State = TypeVar("State", bound=StateProtocol)
 
 
 class StepType:
@@ -56,7 +61,7 @@ class StepType:
 
 
 @dataclass(init=True, repr=True, eq=True, frozen=True)
-class TimeStep(Generic[Observation]):
+class TimeStep(Generic[Observation, RewardT, DiscountT, StepT]):
     """Defines the datastructure that is communicated to the Agent.
 
     While dm_env utilizes a NamedTuple, we opted for a mappable dataclass
@@ -86,9 +91,9 @@ class TimeStep(Generic[Observation]):
             training or for generally monitorring Agent behaviour.
             This field is excluded from object comparisons.
     """
-    step_type: Int8[Array, '']
-    reward: PyTree[ArrayLike]
-    discount: PyTree[ArrayLike]
+    step_type: StepT
+    reward: RewardT
+    discount: DiscountT
     observation: Observation
     extras: dict[str, Any] | None = field(default=None, compare=False)
 
@@ -107,7 +112,10 @@ class TimeStep(Generic[Observation]):
 
 # Define Environment and Wrapper
 
-class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
+class Environment(
+    Generic[State, Action, Observation, RewardT, DiscountT],
+    metaclass=abc.ABCMeta
+):
     """Interface for defining Environment logic for RL-Agents. """
 
     def __init__(self, *, renderer: Callable[[State], Any] | None = None):
@@ -145,7 +153,9 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
         return self
 
     @abc.abstractmethod
-    def reset(self, key: jax.random.KeyArray) -> tuple[State, TimeStep]:
+    def reset(self, key: jax.random.KeyArray) -> tuple[
+        State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
+    ]:
         """Starts a new episode as a functionally pure transformation.
 
         Args:
@@ -161,7 +171,9 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
         """
 
     @abc.abstractmethod
-    def step(self, state: State, action: Action) -> tuple[State, TimeStep]:
+    def step(self, state: State, action: Action) -> tuple[
+        State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
+    ]:
         """Updates the environment according to the given state and action.
 
         If the environment already returned a `TimeStep` with `StepType.LAST`
@@ -277,8 +289,8 @@ class Environment(Generic[State, Action, Observation], metaclass=abc.ABCMeta):
 
 
 class Wrapper(
-    Environment[State, Action, Observation],
-    Generic[State, Action, Observation],
+    Environment[State, Action, Observation, RewardT, DiscountT],
+    Generic[State, Action, Observation, RewardT, DiscountT],
     metaclass=abc.ABCMeta
 ):
     """Interface for Composing Environment logic for RL-Agents. """
@@ -320,10 +332,14 @@ class Wrapper(
         """Helper function to unpack Composite Environments to the base."""
         return self.env.unwrapped
 
-    def reset(self, key: jax.random.KeyArray) -> tuple[State, TimeStep]:
+    def reset(self, key: jax.random.KeyArray) -> tuple[
+        State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
+    ]:
         return self.env.reset(key)
 
-    def step(self, state: State, action: Action) -> tuple[State, TimeStep]:
+    def step(self, state: State, action: Action) -> tuple[
+        State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
+    ]:
         return self.env.step(state, action)
 
     def reward_spec(self) -> specs.Spec:
@@ -350,7 +366,12 @@ def restart(
         extras: dict | None = None,
         shape: int | Sequence[int] = (),
         dtype: Any = float
-) -> TimeStep:
+) -> TimeStep[
+    Observation,
+    PyTree[Num[Array, '...']],
+    PyTree[Num[Array, '...']],
+    Int8[Array, '']
+]:
     """Returns a `TimeStep` with `step_type` set to `StepType.FIRST`.
 
     Unlike dm_env the reward and discount are not `None` to prevent array
@@ -371,7 +392,12 @@ def transition(
         discount: PyTree[Num[Array, '...']] | None = None,
         extras: dict | None = None,
         shape: int | Sequence[int] = ()
-) -> TimeStep:
+) -> TimeStep[
+    Observation,
+    PyTree[Num[Array, '...']],
+    PyTree[Num[Array, '...']],
+    Int8[Array, '']
+]:
     """Returns a `TimeStep` with `step_type` set to `StepType.MID`. """
     return TimeStep(
         step_type=StepType.MID,
@@ -387,7 +413,12 @@ def termination(
         observation: Observation,
         extras: dict | None = None,
         shape: int | Sequence[int] = ()
-) -> TimeStep:
+) -> TimeStep[
+    Observation,
+    PyTree[Num[Array, '...']],
+    PyTree[Num[Array, '...']],
+    Int8[Array, '']
+]:
     """Returns a `TimeStep` with `step_type` set to `StepType.LAST`. """
     return TimeStep(
         step_type=StepType.LAST,
@@ -404,7 +435,12 @@ def truncation(
         discount: PyTree[Num[Array, '...']] | None = None,
         extras: dict | None = None,
         shape: int | Sequence[int] = ()
-) -> TimeStep:
+) -> TimeStep[
+    Observation,
+    PyTree[Num[Array, '...']],
+    PyTree[Num[Array, '...']],
+    Int8[Array, '']
+]:
     """Alternative to `termination` that does not set `discount` to zero. """
     return TimeStep(
         step_type=StepType.LAST,

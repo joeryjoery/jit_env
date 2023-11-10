@@ -21,14 +21,14 @@ class DummyEnv(jit_env.Environment):
     def reset(
             self,
             key: jax.random.KeyArray
-    ) -> tuple[jit_env.State, jit_env.TimeStep]:
+    ) -> tuple[DummyState, jit_env.TimeStep]:
         return DummyState(key=key), jit_env.restart(jax.numpy.zeros(()))
 
     def step(
             self,
-            state: jit_env.State,
+            state: DummyState,
             action: jit_env.Action
-    ) -> tuple[jit_env.State, jit_env.TimeStep]:
+    ) -> tuple[DummyState, jit_env.TimeStep]:
         if action is None:
             return state, jit_env.termination(*jax.numpy.ones((2,)))
         return state, jit_env.transition(*jax.numpy.ones((3,)))

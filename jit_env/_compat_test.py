@@ -97,7 +97,7 @@ class TestDMEnvConversion:
     ):
         out_spec = to_dm_spec(in_spec)
 
-        _ = jax.tree_map(lambda a, b: type(a) == type(b), out_spec, dm_spec)
+        _ = jax.tree_map(lambda a, b: type(a) is type(b), out_spec, dm_spec)
         _ = jax.tree_map(lambda a, b: a.name == b.name, out_spec, dm_spec)
         _ = jax.tree_map(lambda a, b: a.shape == b.shape, out_spec, dm_spec)
         _ = jax.tree_map(lambda a, b: a.dtype == b.dtype, out_spec, dm_spec)
@@ -105,9 +105,9 @@ class TestDMEnvConversion:
         samples = jax.tree_map(lambda s: s.generate_value(), out_spec)
         dm_samples = jax.tree_map(lambda s: s.generate_value(), dm_spec)
 
-        chex.assert_trees_all_equal(samples, dm_samples, ignore_nones=True)
+        chex.assert_trees_all_equal(samples, dm_samples)
         chex.assert_trees_all_equal_shapes_and_dtypes(
-            samples, dm_samples, ignore_nones=True
+            samples, dm_samples
         )
 
     @pytest.mark.usefixtures('dummy_env')
@@ -246,7 +246,7 @@ class TestGymEnvConversion:
         """
         out_space = to_gym_space(in_spec)
 
-        _ = jax.tree_map(lambda a, b: type(a) == type(b), out_space, gym_space)
+        _ = jax.tree_map(lambda a, b: type(a) is type(b), out_space, gym_space)
         _ = jax.tree_map(lambda a, b: a.shape == b.shape, out_space, gym_space)
         _ = jax.tree_map(lambda a, b: a.dtype == b.dtype, out_space, gym_space)
 
@@ -256,16 +256,16 @@ class TestGymEnvConversion:
 
         # Numpy uses 64-bits for default precision, jax uses 32-bits.
         chex.assert_trees_all_equal_shapes(  # Differs in Type Accuracy
-            samples, gym_converted, ignore_nones=True
+            samples, gym_converted
         )
         chex.assert_trees_all_equal_shapes(  # Differs in Type Accuracy
-            samples, gym_samples, ignore_nones=True
+            samples, gym_samples
         )
         # Note: The following line is important to test, but the current API
         # of gymnasium does not allow setting explicit dtypes for `Discrete`.
         # TODO: Comment out following line when dtype API compatible.
         # chex.assert_trees_all_equal_shapes_and_dtypes(
-        #     gym_samples, gym_converted, ignore_nones=True
+        #     gym_samples, gym_converted
         # )
 
         # Check if dtype can be accurately promoted/ demoted/ converted.
@@ -273,8 +273,7 @@ class TestGymEnvConversion:
             lambda a, b: np.can_cast(a.dtype, b.dtype, casting='same_kind'),
             lambda a, b: f'DType conversion of {a.dtype} does '
                          f'not return a subdtype of {b.dtype}',
-            samples, gym_samples,
-            ignore_nones=True
+            samples, gym_samples
         )
 
     @pytest.mark.usefixtures('dummy_env')
