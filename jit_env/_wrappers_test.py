@@ -68,7 +68,8 @@ def test_unwrap(dummy_env: jit_env.Environment):
 @pytest.mark.usefixtures('dummy_env')
 def test_jit(
         dummy_env: jit_env.Environment[
-            jit_env.State, jax.Array, jit_env.Observation
+            jit_env.State, jax.Array, jit_env.Observation,
+            jit_env.Reward, jit_env.Discount
         ]
 ):
     jitted = wrappers.Jit(dummy_env)
@@ -196,7 +197,8 @@ class TestVmap:
     def test_env(
             self,
             dummy_env: jit_env.Environment[
-                jit_env.State, jax.Array, jit_env.Observation
+                jit_env.State, jax.Array, jit_env.Observation,
+                jit_env.Reward, jit_env.Discount
             ],
             batch_size: int = 5
     ):
@@ -236,7 +238,8 @@ class TestVmap:
     def test_render(
             self,
             dummy_env: jit_env.Environment[
-                jit_env.State, jit_env.Action, jit_env.Observation
+                jit_env.State, jit_env.Action, jit_env.Observation,
+                jit_env.Reward, jit_env.Discount
             ],
             batch_size: int = 5
     ):
@@ -263,7 +266,8 @@ class TestVmap:
     def test_wrongly_wrapped_autoreset(
             self,
             dummy_env: jit_env.Environment[
-                jit_env.State, jit_env.Action, jit_env.Observation
+                jit_env.State, jit_env.Action, jit_env.Observation,
+                jit_env.Reward, jit_env.Discount
             ]
     ):
         vmap_first = wrappers.AutoReset(wrappers.Vmap(dummy_env))
@@ -284,7 +288,8 @@ class TestVmap:
     def test_autoreset(
             self,
             dummy_env: jit_env.Environment[
-                jit_env.State, jit_env.Action, jit_env.Observation
+                jit_env.State, jit_env.Action, jit_env.Observation,
+                jit_env.Reward, jit_env.Discount
             ],
             num: int = 2
     ):
@@ -391,7 +396,8 @@ class TestTile:
     def test_autoreset(
             self,
             dummy_env: jit_env.Environment[
-                jit_env.State, jit_env.Action, jit_env.Observation
+                jit_env.State, jit_env.Action, jit_env.Observation,
+                jit_env.Reward, jit_env.Discount
             ],
             num: int = 2
     ):
