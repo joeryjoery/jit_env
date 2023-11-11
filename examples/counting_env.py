@@ -18,7 +18,7 @@ else:
     from chex import dataclass
 
 
-@dataclass(frozen=True)
+@dataclass
 class MyState:
     key: PRNGKeyArray
     count: Int32[jax.Array, '']

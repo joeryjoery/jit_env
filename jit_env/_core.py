@@ -176,7 +176,11 @@ class Environment(
         """
 
     @abc.abstractmethod
-    def step(self, state: State, action: Action) -> tuple[
+    def step(
+            self,
+            state: State,
+            action: Action
+    ) -> tuple[
         State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
     ]:
         """Updates the environment according to the given state and action.
@@ -283,7 +287,9 @@ class Environment(
             )
         return self._renderer(state)
 
-    def __enter__(self) -> Environment:
+    def __enter__(self) -> Environment[
+        State, Action, Observation, RewardT, DiscountT
+    ]:
         """Allows the environment to be used in a with-statement context."""
         return self
 
@@ -374,7 +380,7 @@ class Wrapper(
 
 def restart(
         observation: Observation,
-        extras: dict | None = None,
+        extras: dict[str, Any] | None = None,
         shape: int | Sequence[int] = (),
         dtype: Any = float
 ) -> TimeStep[
@@ -401,7 +407,7 @@ def transition(
         reward: PyTree[Num[Array, '...']],
         observation: Observation,
         discount: PyTree[Num[Array, '...']] | None = None,
-        extras: dict | None = None,
+        extras: dict[str, Any] | None = None,
         shape: int | Sequence[int] = ()
 ) -> TimeStep[
     Observation,
@@ -422,7 +428,7 @@ def transition(
 def termination(
         reward: PyTree[Num[Array, '...']],
         observation: Observation,
-        extras: dict | None = None,
+        extras: dict[str, Any] | None = None,
         shape: int | Sequence[int] = ()
 ) -> TimeStep[
     Observation,
@@ -444,7 +450,7 @@ def truncation(
         reward: PyTree[Num[Array, '...']],
         observation: Observation,
         discount: PyTree[Num[Array, '...']] | None = None,
-        extras: dict | None = None,
+        extras: dict[str, Any] | None = None,
         shape: int | Sequence[int] = ()
 ) -> TimeStep[
     Observation,
