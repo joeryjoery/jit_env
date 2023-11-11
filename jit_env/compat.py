@@ -30,7 +30,7 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
     If the library can not be loaded, this function suppresses the error.
 
     Returns:
-        None if dm_env cannot be imported. Otherwise it returns a tuple with;
+        None if dm_env cannot be imported, otherwise it returns a tuple with;
         1)  A dm_env.Environment that is initialized with a jit_env.Environment
             and a jax Pseudo RNG Key.
         2)  A function that converts jit_env.specs to compatible dm_env.specs.

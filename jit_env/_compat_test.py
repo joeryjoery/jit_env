@@ -232,7 +232,7 @@ class TestGymEnvConversion:
     ):
         """
 
-        Note that Gymnasium.spaces.Dict implements an collections.OrderedDict
+        Note that Gymnasium.spaces.Dict implements a collections.OrderedDict
         at version==0.28.0. Until this is changed, this results in us
         opting for using `Tree` to compare to the gym `Dict` over our
         version of `Dict`. We might change this test in the future if this is

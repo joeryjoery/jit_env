@@ -174,8 +174,8 @@ class BatchSpecMixin:
     def reward_spec(self) -> _specs.Batched | _specs.Array:
         """Either reshape or compose env.reward_spec() to a batch.
 
-        If the env.reward_spec() is a Array type, which allows for reshaping,
-        the spec is reshaped. Otherwise it is composed with Batched.
+        If the env.reward_spec() is Array, which allows for reshaping,
+        the spec is reshaped, otherwise it is composed with Batched.
         """
         spec = self.env.reward_spec()
         if isinstance(spec, _specs.Array):
@@ -186,12 +186,12 @@ class BatchSpecMixin:
     def discount_spec(self) -> _specs.Batched | _specs.BoundedArray:
         """Either reshape or compose env.discount_spec() to a batch.
 
-        If the env.discount_spec() is a Array type, which allows for reshaping,
-        the spec is reshaped. Otherwise it is composed with Batched.
+        If the env.discount_spec() is Array, which allows for reshaping,
+        the spec is reshaped, otherwise it is composed with Batched.
         """
         spec = self.env.discount_spec()
         if isinstance(spec, _specs.BoundedArray):
-            # TODO: Not compatibile with Array (should not be valid anyway).
+            # TODO: Not compatible with Array (should not be valid anyway).
             return _specs.reshape_spec(spec, prepend=(self.num,))
 
         return _specs.Batched(self.env.discount_spec(), num=self.num)
@@ -288,7 +288,7 @@ class AutoReset(ResetMixin, _core.Wrapper):
 
     WARNING: do not wrap `Vmap` on this Wrapper. This will lead to both step
     and reset functions being traced on every `step` call.
-    Instead opt to use `AutoResetVmap`.
+    Instead, opt to use `AutoResetVmap`.
     """
 
     def step(
@@ -300,7 +300,7 @@ class AutoReset(ResetMixin, _core.Wrapper):
 
         If the environment returned a `TimeStep` with `StepType.LAST`, then
         the `reset` function is called again to restart the `State` and
-        `TimeStep` objects. Note that the resetted `TimeStep` object
+        `TimeStep` objects. Note that the reset `TimeStep` object
         maintains the reward, discount, and extras field of the terminated
         `TimeStep`. Only the `step_type` and `observation` fields correspond
         to the restarted Environment.
@@ -319,9 +319,9 @@ class AutoReset(ResetMixin, _core.Wrapper):
             2)  The TimeStep object will always have step_type set to
                 `StepType.MID` since `StepType.LAST` is reset internally
                 through a call to `env.reset`. The reward, discount, and
-                extras fields of a terminal step are carried to the resetted
+                extras fields of a terminal step are carried to the reset
                 step. Only the observation and step_type correspond to the
-                resetted State.
+                reset State.
         """
         state, timestep = self.env.step(state, action)
 
@@ -357,7 +357,7 @@ class VmapAutoReset(ResetMixin, Vmap):
         # Batched homogenous computation using `Vmap`.
         state, timestep = super().step(state, action)
 
-        # Map heterogeneous computation (non-parallelizable).
+        # Map heterogeneous computation (non-SIMD).
         state, timestep = _jax.lax.map(self._maybe_reset, (state, timestep))
 
         return state, timestep
@@ -388,7 +388,7 @@ class TileAutoReset(Tile, VmapAutoReset):
     The shortened MRO is given by:
     [TileAutoReset, Tile, BatchSpecMixin, VmapAutoReset, ResetMixin, Vmap, ...]
 
-    The mixed in functions by evalation order are:
+    The mixed in functions by evaluation order are:
     [(), (reset), (*_spec), (step, _maybe_reset), (_identity, _auto_reset),
     (reset, step, render)]
     """

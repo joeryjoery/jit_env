@@ -217,7 +217,7 @@ class TestTree:
         tree_spec.validate(out)
         with pytest.raises(TypeError):
             # Wrong Pytree structure (batch, batch) should be (batch, scalar)
-            # Error should be raise internally by `jnp.asarray(value)`.
+            # An error should be raised internally by `jnp.asarray(value)`.
             tree_spec.validate(
                 DummyStruct(my_spec=out.my_spec, other_spec=out.my_spec)
             )
@@ -416,13 +416,13 @@ class TestBounded:
 
     def test_wrong_shape(self):
         with pytest.raises(ValueError):
-            # Non-broadcastable
+            # Not broadcast compatible
             _ = specs.BoundedArray(
                 shape=(2, 2, 2), dtype=jnp.float32,
                 minimum=jnp.zeros((3, 1, 3)), maximum=jnp.ones((2,))
             )
         with pytest.raises(ValueError):
-            # Non-broadcastable
+            # Not broadcast compatible
             _ = specs.BoundedArray(
                 shape=(2, 2, 2), dtype=jnp.float32,
                 minimum=jnp.zeros((2,)), maximum=jnp.ones((3, 1, 3))

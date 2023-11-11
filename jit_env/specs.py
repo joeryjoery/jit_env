@@ -3,8 +3,8 @@
 These classes aim to communicate what data-structures are communicated
 between an Agent and the Environment before these structures exist.
 
-Warning: do not import the classes from this module separately! Instead
-import this module as is to prevent confusion with name clashes from e.g.,
+Warning: do not import the classes from this module separately! Import
+this module as is to prevent confusion with name clashes from e.g.,
 typing.Tuple or different spec type implementations by third parties.
 
 In other words, the proper usage of this module is::
@@ -45,7 +45,7 @@ _T = _typing.TypeVar("_T")
 class Spec(_typing.Generic[_T], metaclass=_abc.ABCMeta):
     """Interface for defining datastructure Specifications.
 
-    This type is meant to 'Specify' a datastructure's shapes, types, and
+    This type is meant to 'Specify' a datastructure shape, type, and
     general structure without needing to instantiate said structure.
 
     We copy the `__slots__` implementation from `dm_env` with read-only
@@ -99,7 +99,7 @@ class Spec(_typing.Generic[_T], metaclass=_abc.ABCMeta):
             raise ValueError(message + f' for spec "{self.name}"')
 
         # ValueError is directly raised outside jax.jit/ jax.vmap/ etc.
-        # Otherwise, it is raised through the XLA dispather.
+        # Otherwise, it is raised through the XLA dispatcher.
         _jax.debug.callback(_raiser)
 
     @_abc.abstractmethod
@@ -153,11 +153,11 @@ class CompositeSpec(Spec[_T], _typing.Generic[_T], metaclass=_abc.ABCMeta):
 
     Since multiple Specs may be composed with similar namespaces it becomes
     ambiguous and difficult to specify which objects should be replaced.
-    Furthermore, in deeply nested composite Specs it will not alway be clear
+    Furthermore, in deeply nested composite Specs it will not always be clear
     whether an object needs to be shallow or deep-copied in order to not
     mutate the original Spec.
 
-    Instead, it is safer and more clear to modify any particular leaf Specs
+    Instead, it is safer and clearer to modify any particular leaf Specs
     and rebuild the composite Spec using the constructor.
     """
     __slots__ = ()
@@ -412,7 +412,7 @@ class Tree(CompositeSpec):
                 A sequence of `Spec` objects to treat as the flattened leaves
                 of the given `structure`.
             structure:
-                The Jax PyTree defintion to unflatten `leaves`.
+                The Jax PyTree definition to unflatten `leaves`.
             name:
                 Explicit string name for the Tree specification.
         """
@@ -450,7 +450,7 @@ class Tree(CompositeSpec):
         return cls(children, *aux)
 
     def as_spec_struct(self) -> _jxtype.PyTree[Spec]:
-        """Return the unflattend Spec PyTree as is."""
+        """Return the unflattened Spec PyTree as is."""
         return _tree_util.tree_unflatten(self.treedef, self.leave_specs)
 
     def validate(
@@ -593,7 +593,7 @@ class Batched(CompositeSpec, _typing.Generic[_T]):
     def as_spec_struct(self) -> _jxtype.PyTree[PrimitiveSpec]:
         """Unpack and prepend batch-size to all leaf-specs.
 
-        Warning, to prevent unnecesarily unpacking nested structures, this
+        Warning, to prevent unnecessarily unpacking nested structures, this
         method only unpacks CompositeSpec types by one level, and "re-batches"
         any CompositeSpecs 1 level down.
 
@@ -660,7 +660,7 @@ def reshape_spec(
         prepend: _typing.Sequence[int] = (),
         append: _typing.Sequence[int] = ()
 ) -> Spec:
-    """Utility function to modularly reshape a Spec type.
+    """Utility function for modular reshaping of a Spec type.
 
     This is useful for wrapping Environments with `jax.vmap` like transforms.
 

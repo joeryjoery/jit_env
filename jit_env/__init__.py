@@ -1,7 +1,7 @@
 """Define main module/ API hierarchy.
 
 Private attributes (starting with '_') should not be accessed lest thou would
-risketh the consequences of internal API changes.
+risk the consequences of internal API changes.
 """
 from jit_env.version import __version__, __version_info__
 
@@ -23,7 +23,7 @@ Wrapper = _core.Wrapper
 StepType = _core.StepType
 TimeStep = _core.TimeStep
 
-# Helper functions for creating TimeStep namedtuples with default settings.
+# Helper functions for creating TimeStep objects with default settings.
 restart = _core.restart
 termination = _core.termination
 transition = _core.transition

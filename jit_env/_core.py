@@ -10,7 +10,8 @@ from __future__ import annotations
 import abc
 
 from typing import (
-    Any, TYPE_CHECKING, TypeVar, Generic, Sequence, Protocol, Callable
+    Any, TYPE_CHECKING, TypeVar, Generic, Sequence,
+    Protocol, Callable
 )
 from dataclasses import field
 
@@ -20,9 +21,8 @@ if TYPE_CHECKING:  # pragma: no cover
 else:
     from chex import dataclass
 
-from jaxtyping import Array, ArrayLike, PyTree, Num, Int8, Bool
+from jaxtyping import Array, ArrayLike, PyTree, Num, Int8, Bool, PRNGKeyArray
 
-import jax
 import jax.numpy as jnp
 
 from jit_env import specs
@@ -39,7 +39,7 @@ class StateProtocol(Protocol):
     `step` function, as this could be changed arbitrarily by the caller.
     In turn, this leads to un-reproducible behaviour.
     """
-    key: jax.random.KeyArray
+    key: PRNGKeyArray
 
 
 # The following should all be valid Jax types
@@ -88,7 +88,7 @@ class TimeStep(Generic[Observation, RewardT, DiscountT, StepT]):
             Optional data that is typically not communicated to the Agent
             but allows the user to track certain loss-metrics, accuracies,
             or other information. This can be stored in a Replay Buffer for
-            training or for generally monitorring Agent behaviour.
+            training or for generally monitoring Agent behaviour.
             This field is excluded from object comparisons.
     """
     step_type: StepT
@@ -142,18 +142,23 @@ class Environment(
     def __repr__(self) -> str:
         """Returns a complete informative representation of self.
 
-        Opposed to `str`, the class should be reconstructable from the
+        Opposed to `str`, the class can be reconstructed from the
         `repr` information.
         """
         return self.__str__()
 
     @property
-    def unwrapped(self) -> Environment:
+    def unwrapped(self) -> Environment[
+        State, Action, Observation, RewardT, DiscountT
+    ]:
         """Helper function to support unpacking Composite Environments."""
         return self
 
     @abc.abstractmethod
-    def reset(self, key: jax.random.KeyArray) -> tuple[
+    def reset(
+            self, 
+            key: PRNGKeyArray
+    ) -> tuple[
         State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
     ]:
         """Starts a new episode as a functionally pure transformation.
@@ -167,7 +172,7 @@ class Environment(
             1) The `State` object is expected to carry a chain of `key` values
                in order to internally maintain the random state.
             2) The TimeStep object will have step_type set to `StepType.FIRST`
-               and discount casted to a structure of `1.0` values.
+               and discount cast to a structure of `1.0` values.
         """
 
     @abc.abstractmethod
@@ -213,7 +218,7 @@ class Environment(
 
         Typically, this can be a single float between [0.0, 1.0]. It is also
         typical that the spec has the same dimensionality as the rewards, or
-        at least be 'broadcastable'.
+        that it can be broadcast along the rewards.
 
         Returns:
             A specs.Spec type indicating the discount data-structure.
@@ -295,7 +300,11 @@ class Wrapper(
 ):
     """Interface for Composing Environment logic for RL-Agents. """
 
-    def __init__(self, env: Environment, *args, **kwargs):
+    def __init__(
+            self,
+            env: Environment[State, Action, Observation, RewardT, DiscountT],
+            *args, **kwargs
+    ):
         """Initializes the Composite Environment with a base Environment.
 
         The `env` attribute can be accessed for reading out attributes, but it
@@ -317,8 +326,8 @@ class Wrapper(
     def __repr__(self) -> str:
         """Returns a recursive complete informative representation of self.
 
-        Opposed to `str`, the Wrapped class hierarchy should be
-        reconstructable from the `repr` information.
+        Opposed to `str`, the Wrapped class hierarchy can be
+        reconstructed from the `repr` information.
         """
         return f"{self.__class__.__name__}(env={repr(self.env)})"
 
@@ -328,11 +337,13 @@ class Wrapper(
         return self._env
 
     @property
-    def unwrapped(self) -> Environment:
+    def unwrapped(self) -> Environment[
+        State, Action, Observation, RewardT, DiscountT
+    ]:
         """Helper function to unpack Composite Environments to the base."""
         return self.env.unwrapped
 
-    def reset(self, key: jax.random.KeyArray) -> tuple[
+    def reset(self, key: PRNGKeyArray) -> tuple[
         State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
     ]:
         return self.env.reset(key)
@@ -375,7 +386,7 @@ def restart(
     """Returns a `TimeStep` with `step_type` set to `StepType.FIRST`.
 
     Unlike dm_env the reward and discount are not `None` to prevent array
-    shape inconsistensies when scanning over environments.
+    shape inconsistencies when scanning over environments.
     """
     return TimeStep(
         step_type=StepType.FIRST,

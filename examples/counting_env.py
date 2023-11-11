@@ -8,7 +8,7 @@ import jax.numpy as jnp
 import jit_env
 from jit_env import specs
 
-import jaxtyping as jxtype
+from jaxtyping import PRNGKeyArray, Integer, Int32, Scalar
 
 
 if TYPE_CHECKING:  # pragma: no cover
@@ -20,11 +20,15 @@ else:
 
 @dataclass(frozen=True)
 class MyState:
-    key: jax.random.KeyArray
-    count: jxtype.Int32[jxtype.Array, '']
+    key: PRNGKeyArray
+    count: Int32[jax.Array, '']
 
 
-class CountingEnv(jit_env.Environment):
+class CountingEnv(
+    jit_env.Environment[
+        MyState, Int32[jax.Array, ''], Int32[jax.Array, ''], Scalar, Scalar
+    ]
+):
     """Implement a simple reference Environment that sums Action ints.
 
     The environment accumulates all integer actions until the given maximum
@@ -32,13 +36,13 @@ class CountingEnv(jit_env.Environment):
     it always gives reward and discount = 1.0.
     """
 
-    def __init__(self, maximum: int | jxtype.Integer[jxtype.Array, '']):
+    def __init__(self, maximum: int | Integer[jax.Array, '']):
         super().__init__()
         self.maximum = maximum
 
     def reset(
             self,
-            key: jax.random.KeyArray
+            key: PRNGKeyArray
     ) -> tuple[MyState, jit_env.TimeStep]:
         state = MyState(key=key, count=jnp.zeros((), jnp.int32))
         return state, jit_env.restart(state.count, shape=())

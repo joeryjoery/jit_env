@@ -281,7 +281,7 @@ class TestVmap:
             # lax.cond in AutoReset will receive incompatible Array of bools
             vmap_first.step(first, jnp.zeros((5,)))
 
-        # Array of bools can be handled per element by vmapping last.
+        # Array of bools can be handled per element by vmap last.
         vmap_last.step(last, jnp.zeros((5,)))
 
     @pytest.mark.usefixtures('dummy_env')
