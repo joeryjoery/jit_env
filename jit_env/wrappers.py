@@ -9,12 +9,20 @@ This Module implements Wrappers for:
 from __future__ import annotations as _annotations
 import typing as _typing
 
+from dataclasses import replace as _replace
+
 import jax as _jax
 
 from jaxtyping import PRNGKeyArray as _PRNGKeyArray
 
 import jit_env
-from jit_env import _core
+from jit_env import (
+    _core,
+    Observation as _Obs,
+    Action as _Act,
+    Reward as _Rew,
+    Discount as _Disc
+)
 from jit_env import specs as _specs
 
 
@@ -405,3 +413,52 @@ class TileAutoReset(Tile, VmapAutoReset):
     [(), (reset), (*_spec), (step, _maybe_reset), (_identity, _auto_reset),
     (reset, step, render)]
     """
+
+
+class POMDPObservation(_core.Wrapper):
+    """A simple wrapper to nest TimeStep inside TimeStep.observation."""
+
+    class Fields(
+        _typing.NamedTuple,
+        _typing.Generic[_Act, _Obs, _Rew, _Disc]
+    ):
+        step_type: _jax.Array
+        observation: _Obs
+        action: _Act
+        reward: _Rew
+        discount: _Disc
+
+    def reset(
+            self,
+            key: _PRNGKeyArray,
+            *,
+            options: _core.EnvOptions = None
+    ) -> tuple[_core.State, _core.TimeStep]:
+        state, step = super().reset(key, options=options)
+
+        new_step = _replace(step, observation=self.Fields(
+            step_type=step.step_type,
+            observation=step.observation,
+            action=self.action_spec().generate_value(),
+            reward=step.reward,
+            discount=step.discount
+        ))
+
+        return state, new_step
+
+    def step(
+            self,
+            state: _core.State,
+            action: _core.Action
+    ) -> tuple[_core.State, _core.TimeStep]:
+        state, step = super().step(state, action)
+
+        new_step = _replace(step, observation=self.Fields(
+            step_type=step.step_type,
+            observation=step.observation,
+            action=action,
+            reward=step.reward,
+            discount=step.discount
+        ))
+
+        return state, new_step
