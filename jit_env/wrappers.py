@@ -11,6 +11,8 @@ import typing as _typing
 
 import jax as _jax
 
+from jaxtyping import PRNGKeyArray as _PRNGKeyArray
+
 import jit_env
 from jit_env import _core
 from jit_env import specs as _specs
@@ -48,9 +50,11 @@ class Jit(_core.Wrapper):
 
     def reset(
             self,
-            key: _jax.random.KeyArray
+            key: _PRNGKeyArray,
+            *,
+            options: _core.EnvOptions = None
     ) -> tuple[_core.State, _core.TimeStep]:
-        return self._reset_fun(key)
+        return self._reset_fun(key, options=options)
 
     def step(
             self,
@@ -99,9 +103,11 @@ class Vmap(_core.Wrapper):
 
     def reset(
             self,
-            key: _jax.random.KeyArray  # (Batch, dim_key)
+            key: _PRNGKeyArray,  # (Batch, dim_key)
+            *,
+            options: _core.EnvOptions = None
     ) -> tuple[_core.State, _core.TimeStep]:
-        return self._reset_fun(key)
+        return self._reset_fun(key, options=options)
 
     def step(
             self,
@@ -217,9 +223,13 @@ class Tile(BatchSpecMixin, Vmap):
 
     def reset(
             self,
-            key: _jax.random.KeyArray
+            key: _PRNGKeyArray,
+            *,
+            options: _core.EnvOptions = None
     ) -> tuple[_core.State, _core.TimeStep]:
-        return super().reset(_jax.random.split(key, num=self.num))
+        return super().reset(
+            _jax.random.split(key, num=self.num), options=options
+        )
 
 
 class ResetMixin:
@@ -257,8 +267,11 @@ class ResetMixin:
                and extras fields are copied from the `step` argument.
         """
 
+        # See jit_env.StateWithOptionsProtocol
+        options = getattr(state, 'options', None)
+
         key, _ = _jax.random.split(state.key)
-        state, reset_timestep = self.env.reset(key)
+        state, reset_timestep = self.env.reset(key, options=options)
 
         timestep = _core.TimeStep(
             step_type=reset_timestep.step_type,  # Overwrite step

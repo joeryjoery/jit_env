@@ -20,7 +20,9 @@ class DummyEnv(jit_env.Environment):
 
     def reset(
             self,
-            key: jax.random.KeyArray
+            key: jax.random.KeyArray,
+            *,
+            options: jit_env.EnvOptions = None
     ) -> tuple[DummyState, jit_env.TimeStep]:
         return DummyState(key=key), jit_env.restart(jax.numpy.zeros(()))
 

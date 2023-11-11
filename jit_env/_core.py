@@ -11,9 +11,12 @@ import abc
 
 from typing import (
     Any, TYPE_CHECKING, TypeVar, Generic, Sequence,
-    Protocol, Callable
+    Protocol, Callable, Union
 )
+from typing_extensions import TypeAlias
 from dataclasses import field
+
+import jax
 
 if TYPE_CHECKING:  # pragma: no cover
     # See: https://github.com/python/mypy/issues/6239
@@ -42,15 +45,31 @@ class StateProtocol(Protocol):
     key: PRNGKeyArray
 
 
-# The following should all be valid Jax types
+class StateWithOptionsProtocol(StateProtocol):
+    """Extension of StateProtocol to memorize Environment.reset Options."""
+    options: EnvOptions = None
+
+
+# The following should all be valid Jax types (not explicitly enforced)
+State = TypeVar("State", bound=Union[StateProtocol, StateWithOptionsProtocol])
 Action = TypeVar("Action")
 
 Observation = TypeVar("Observation")
-StepT = TypeVar("StepT", bound=Int8[Array, ''])
-RewardT = TypeVar("RewardT", bound=PyTree[ArrayLike])
-DiscountT = TypeVar("DiscountT", bound=PyTree[ArrayLike])
+StepT = TypeVar("StepT", bound=PyTree[
+    Union[Int8[Array, ''], int, jax.ShapeDtypeStruct, None]
+])
+RewardT = TypeVar("RewardT", bound=PyTree[
+    Union[ArrayLike, jax.ShapeDtypeStruct, None]
+])
+DiscountT = TypeVar("DiscountT", bound=PyTree[
+    Union[ArrayLike, jax.ShapeDtypeStruct, None]
+])
 
-State = TypeVar("State", bound=StateProtocol)
+# Modify Environment behaviour through reset with a generic datastructure.
+# See also the Flax documentation on how to effectively manipulate such a
+# structure in combination with Jax Transforms like Jit or Vmap:
+#  - https://flax.readthedocs.io/en/latest/api_reference/flax.struct.html
+EnvOptions: TypeAlias = Union[PyTree[Any], dict[str, Any], None]
 
 
 class StepType:
@@ -156,15 +175,31 @@ class Environment(
 
     @abc.abstractmethod
     def reset(
-            self, 
-            key: PRNGKeyArray
+            self,
+            key: PRNGKeyArray,
+            *,
+            options: EnvOptions = None
     ) -> tuple[
         State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
     ]:
         """Starts a new episode as a functionally pure transformation.
 
+        Optionally, one can pass in an `options` structure to modify the
+        reset behaviour slightly. Note that this poses the dangers of
+        non-homogenous computations (i.e., non-SIMD). As an example, if
+        array shapes change due to a dimensionality flag in `options`, then
+        a jax.jit compiled Environment may re-compile or even crash!
+
+        Thus, the `options` should be carefully used when doing something like
+        curriculum learning or adversarial Environment creation. Functionality
+        like increasing the number of obstacles/ enemies in a maze is fine as
+        this is agnostic to the environment dimensionality.
+
         Args:
             key: Pseudo RNG Key to initialize `State` with.
+            *
+            options (kw-only):
+                Optional arguments for modifying environment parameters.
 
         Returns:
             A tuple of `State` and `TimeStep` at indices;
@@ -349,10 +384,10 @@ class Wrapper(
         """Helper function to unpack Composite Environments to the base."""
         return self.env.unwrapped
 
-    def reset(self, key: PRNGKeyArray) -> tuple[
+    def reset(self, key: PRNGKeyArray, *, options: EnvOptions = None) -> tuple[
         State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
     ]:
-        return self.env.reset(key)
+        return self.env.reset(key, options=options)
 
     def step(self, state: State, action: Action) -> tuple[
         State, TimeStep[Observation, RewardT, DiscountT, Int8[Array, '']]
