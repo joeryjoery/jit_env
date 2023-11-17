@@ -9,6 +9,9 @@ This Module implements Wrappers for:
 from __future__ import annotations as _annotations
 import typing as _typing
 
+from collections import namedtuple as _namedtuple
+from dataclasses import replace as _replace, fields as _fields
+
 import jax as _jax
 
 from jaxtyping import PRNGKeyArray as _PRNGKeyArray
@@ -405,3 +408,152 @@ class TileAutoReset(Tile, VmapAutoReset):
     [(), (reset), (*_spec), (step, _maybe_reset), (_identity, _auto_reset),
     (reset, step, render)]
     """
+
+
+class ExtendObservation(_core.Wrapper):
+    """A simple wrapper to nest TimeStep fields inside the observation."""
+    _OBS_FIELD: str = "Observation"
+
+    def __init__(
+            self,
+            env: jit_env.Environment,
+            *values: str | _typing.Literal[
+                'step_type',
+                'observation',
+                'action',
+                'reward',
+                'discount',
+            ]
+    ):
+        """Extend the Observation of `env` with the given TimeStep field values
+
+        The new observations are nested inside a namedtuple. Example usage,
+
+        > wrapped = ExtendObservation(env, 'observation', 'action', 'discount')
+
+        Args:
+            env:
+                The environment to extend the observation space of.
+            *values:
+                Field names from TimeStep and/ or 'action' to include in the
+                Observation.
+
+        See:
+            TimeStep for all available fields + Action.
+
+        Raises:
+            ValueError:
+                If no values are provided or if they aren't a valid field.
+        """
+        if not values:
+            raise ValueError("Empty Observation fields indicated.")
+
+        super().__init__(env)
+
+        filtered: set[str] = set(values)  # removes duplicates
+        valid = {f.name for f in _fields(jit_env.TimeStep)} | {'action'}
+
+        for name in filtered:
+            if name not in valid:
+                raise ValueError(
+                    f"Value {name} is not a valid "
+                    f"field of {jit_env.TimeStep.__name__}."
+                )
+
+        self.fields = filtered
+        self.ObsStruct = _namedtuple(self._OBS_FIELD, filtered)  # type: ignore
+
+    @classmethod
+    def pomdp_fields(
+            cls: _typing.Type[ExtendObservation],
+            env: jit_env.Environment
+    ) -> ExtendObservation:
+        """Extend the Observation by nesting the full TimeStep in Observation.
+
+        This is useful for modelling Partially Observable Markov Decision
+        Processes as one needs all data to accurately infer posterior
+        distributions of the True model.
+
+        Args:
+            env:
+                The environment to extend the observation space of.
+
+        Returns:
+            ExtendObservation:
+                A wrapped version of `env` that includes all TimeStep
+                fields in the Observation.
+        """
+        return cls(
+            env,
+            'observation', 'action', 'reward', 'discount', 'step_type'
+        )
+
+    def reset(
+            self,
+            key: _PRNGKeyArray,
+            *,
+            options: _core.EnvOptions = None
+    ) -> tuple[_core.State, _core.TimeStep]:
+        state, step = super().reset(key, options=options)
+
+        dummy_action = self.env.action_spec().generate_value()
+        extracted = {
+            f: (getattr(step, f) if f != 'action' else dummy_action)
+            for f in self.fields
+        }
+        new_obs = self.ObsStruct(**extracted)
+        new_step = _replace(step, observation=new_obs)
+
+        return state, new_step
+
+    def step(
+            self,
+            state: _core.State,
+            action: _core.Action
+    ) -> tuple[_core.State, _core.TimeStep]:
+        state, step = super().step(state, action)
+
+        extracted = {
+            f: (getattr(step, f) if f != 'action' else action)
+            for f in self.fields
+        }
+        new_obs = self.ObsStruct(**extracted)
+        new_step = _replace(step, observation=new_obs)
+
+        return state, new_step
+
+    def observation_spec(self) -> _specs.Tree:
+        """Compose the base env.observation_spec() inside a Batched Spec."""
+
+        obs_specs = dict()
+        for name in self.fields:
+
+            if name == 'action':
+                obs_specs[name] = self.env.action_spec()
+
+            elif name == 'observation':
+                obs_specs[name] = self.env.observation_spec()
+
+            elif name == 'reward':
+                obs_specs[name] = self.env.reward_spec()
+
+            elif name == 'discount':
+                obs_specs[name] = self.env.discount_spec()
+
+            elif name == 'step_type':
+
+                # The `step_type` doesn't have a spec, so we need to trace.
+                _, step = _jax.eval_shape(
+                    self.reset, _jax.random.key(0), options=None
+                )
+                shape_dtype = step.step_type
+
+                obs_specs[name] = _specs.BoundedArray(
+                    shape=shape_dtype.shape, dtype=shape_dtype.dtype,
+                    minimum=0, maximum=3
+                )
+
+        obs_spec_struct = self.ObsStruct(**obs_specs)
+        leaves, treedef = _jax.tree_util.tree_flatten(obs_spec_struct)
+
+        return _specs.Tree(leaves, treedef)
