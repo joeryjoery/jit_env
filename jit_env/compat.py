@@ -88,7 +88,7 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
         def __init__(
                 self,
                 env: _core.Environment,
-                rng: _jax.random.KeyArray = _jax.random.PRNGKey(0),
+                rng: _jxtype.PRNGKeyArray = _jax.random.key(0),
                 *,
                 options: _core.EnvOptions = None
         ):
@@ -201,7 +201,7 @@ def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
 
             self.env = env
 
-            self.rng: _jax.random.KeyArray = _jax.random.PRNGKey(seed)
+            self.rng: _jxtype.PRNGKeyArray = _jax.random.key(seed)
             self.env_state, _ = env.reset(self.rng)
 
             self.metadata.update({
@@ -222,7 +222,7 @@ def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
 
         def _seed(self, seed: int = 0):
             """Set RNG seed (or use 0)"""
-            self.rng = _jax.random.PRNGKey(seed)
+            self.rng = _jax.random.key(seed)
 
         def step(
                 self, action: _core.Action

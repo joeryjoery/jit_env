@@ -65,6 +65,8 @@ def test_unwrap(dummy_env: jit_env.Environment):
     assert doubly_wrapped.env is wrapped
 
 
+# TODO: https://github.com/joeryjoery/jit_env/issues/30
+@pytest.mark.filterwarnings("ignore:divide by zero encountered in equal")
 @pytest.mark.usefixtures('dummy_env')
 def test_jit(
         dummy_env: jit_env.Environment[
@@ -78,8 +80,8 @@ def test_jit(
     jit_state: jit_env.State
 
     # Reset logic
-    state, step = dummy_env.reset(jax.random.PRNGKey(0))
-    jit_state, jit_step = jitted.reset(jax.random.PRNGKey(0))
+    state, step = dummy_env.reset(jax.random.key(0))
+    jit_state, jit_step = jitted.reset(jax.random.key(0))
 
     chex.assert_trees_all_equal(state, jit_state)
     chex.assert_trees_all_equal(step, jit_step)
@@ -134,7 +136,7 @@ def test_stopgrad(dummy_env: jit_env.Environment):
     action = jnp.ones_like(dummy_env.action_spec().generate_value())
     action = action * 10.0
 
-    state, _ = dummy_env.reset(jax.random.PRNGKey(0))
+    state, _ = dummy_env.reset(jax.random.key(0))
     _, reference_step = dummy_env.step(state, action)
 
     jac = jacfun(state, action)
@@ -151,8 +153,8 @@ def test_stopgrad(dummy_env: jit_env.Environment):
 def test_autoreset(dummy_env: jit_env.Environment):
     env = wrappers.AutoReset(dummy_env)
 
-    state, step = env.reset(jax.random.PRNGKey(0))
-    ref_state, ref_step = dummy_env.reset(jax.random.PRNGKey(0))
+    state, step = env.reset(jax.random.key(0))
+    ref_state, ref_step = dummy_env.reset(jax.random.key(0))
 
     assert step.first()
     assert ref_step.first()
@@ -202,7 +204,7 @@ class TestVmap:
             ],
             batch_size: int = 5
     ):
-        key = jax.random.PRNGKey(0)
+        key = jax.random.key(0)
         batched = wrappers.Vmap(dummy_env)
 
         # For type checker
@@ -243,7 +245,7 @@ class TestVmap:
             ],
             batch_size: int = 5
     ):
-        key = jax.random.PRNGKey(0)
+        key = jax.random.key(0)
         batched = wrappers.Vmap(dummy_env)
 
         # For type checker
@@ -273,7 +275,7 @@ class TestVmap:
         vmap_first = wrappers.AutoReset(wrappers.Vmap(dummy_env))
         vmap_last = wrappers.Vmap(wrappers.AutoReset(dummy_env))
 
-        keys = jax.random.split(jax.random.PRNGKey(0), num=5)
+        keys = jax.random.split(jax.random.key(0), num=5)
         first, _ = vmap_first.reset(keys)
         last: jit_env.State = vmap_last.reset(keys)[0]
 
@@ -299,7 +301,7 @@ class TestVmap:
             wrappers.AutoReset(dummy_env), in_axes=(0, None)
         )
         singly_wrapped = wrappers.VmapAutoReset(dummy_env, in_axes=(0, None))
-        keys = jax.random.split(jax.random.PRNGKey(0), num=num)
+        keys = jax.random.split(jax.random.key(0), num=num)
 
         # For type checker
         doubly_out: tuple[jit_env.State, jit_env.TimeStep]
@@ -386,7 +388,7 @@ class TestTile:
     def test_tile(self, dummy_env: jit_env.Environment, num: int = 2):
         # Test distinguishing feature of Tile Vs. Vmap.
         tiled_env = wrappers.Tile(dummy_env, num=num)
-        states, steps = tiled_env.reset(jax.random.PRNGKey(0))  # type: ignore
+        states, steps = tiled_env.reset(jax.random.key(0))  # type: ignore
 
         chex.assert_tree_shape_prefix(
             (states, steps), (num,)
@@ -405,14 +407,14 @@ class TestTile:
         vmapped = wrappers.VmapAutoReset(dummy_env, in_axes=(0, None))
         tiled = wrappers.TileAutoReset(dummy_env, num=num, in_axes=(0, None))
 
-        keys = jax.random.split(jax.random.PRNGKey(0), num=num)
+        keys = jax.random.split(jax.random.key(0), num=num)
 
         # For type checker
         vmap_out: tuple[jit_env.State, jit_env.TimeStep]
         tile_out: tuple[jit_env.State, jit_env.TimeStep]
 
         vmap_out = vmapped.reset(keys)
-        tile_out = tiled.reset(jax.random.PRNGKey(0))
+        tile_out = tiled.reset(jax.random.key(0))
 
         chex.assert_trees_all_equal(vmap_out, tile_out)
         chex.assert_trees_all_equal_shapes_and_dtypes(
@@ -456,7 +458,7 @@ class TestExtendObservation:
 
     @pytest.mark.usefixtures('dummy_env')
     def test_reward_field_only(self, dummy_env: jit_env.Environment):
-        reward_only = wrappers.ExtendObservation(dummy_env,'reward')
+        reward_only = wrappers.ExtendObservation(dummy_env, 'reward')
 
         state, reference = dummy_env.reset(jax.random.key(0))
         _, step = reward_only.reset(jax.random.key(0))

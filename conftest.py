@@ -5,12 +5,14 @@ import pytest
 
 import jax
 
+from jaxtyping import PRNGKeyArray
+
 import jit_env
 from jit_env import specs
 
 
 class DummyState(NamedTuple):
-    key: jax.random.KeyArray
+    key: PRNGKeyArray
 
 
 class DummyEnv(jit_env.Environment):
@@ -20,7 +22,7 @@ class DummyEnv(jit_env.Environment):
 
     def reset(
             self,
-            key: jax.random.KeyArray,
+            key: PRNGKeyArray,
             *,
             options: jit_env.EnvOptions = None
     ) -> tuple[DummyState, jit_env.TimeStep]:

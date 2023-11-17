@@ -117,7 +117,7 @@ class TestDMEnvConversion:
             dummy_env: jit_env.Environment,
             to_dm_wrapper: type
     ):
-        my_dm_env = to_dm_wrapper(dummy_env, jax.random.PRNGKey(0))
+        my_dm_env = to_dm_wrapper(dummy_env, jax.random.key(0))
         env_spec = jit_specs.make_environment_spec(my_dm_env)
 
         step: dm_env.TimeStep = my_dm_env.reset()
