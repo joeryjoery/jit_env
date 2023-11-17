@@ -440,3 +440,97 @@ class TestTile:
         chex.assert_trees_all_equal_shapes_and_dtypes(
             tile_out, vmap_out
         )
+
+
+class TestExtendObservation:
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_empty(self, dummy_env: jit_env.Environment):
+        with pytest.raises(ValueError):
+            wrappers.ExtendObservation(dummy_env)
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_invalid(self, dummy_env: jit_env.Environment):
+        with pytest.raises(ValueError):
+            wrappers.ExtendObservation(dummy_env, 'blabla')
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_reward_field_only(self, dummy_env: jit_env.Environment):
+        reward_only = wrappers.ExtendObservation(dummy_env,'reward')
+
+        state, reference = dummy_env.reset(jax.random.key(0))
+        _, step = reward_only.reset(jax.random.key(0))
+
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            reference.reward, step.observation.reward
+        )
+        chex.assert_trees_all_equal(reference.reward, step.observation.reward)
+
+        dummy_action = dummy_env.action_spec().generate_value()
+        _, reference = dummy_env.step(state, dummy_action)
+        _, step = reward_only.step(state, dummy_action)
+
+        chex.assert_trees_all_equal_shapes_and_dtypes(
+            reference.reward, step.observation.reward
+        )
+        chex.assert_trees_all_equal(reference.reward, step.observation.reward)
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_pomdp(self, dummy_env: jit_env.Environment):
+        wrapped = wrappers.ExtendObservation.pomdp_fields(dummy_env)
+
+        # Perform test using reset
+        dummy_action = dummy_env.action_spec().generate_value()
+        state, reference = dummy_env.reset(jax.random.key(0))
+        _, step = wrapped.reset(jax.random.key(0))
+
+        for field, value in step.observation._asdict().items():
+            if field == 'action':
+                chex.assert_trees_all_equal_shapes_and_dtypes(
+                    value, dummy_action
+                )
+                chex.assert_trees_all_equal(value, dummy_action)
+            else:
+                chex.assert_trees_all_equal_shapes_and_dtypes(
+                    value, getattr(reference, field)
+                )
+                chex.assert_trees_all_equal(value, getattr(reference, field))
+
+        # Perform test using step
+        _, reference = dummy_env.step(state, dummy_action)
+        _, step = wrapped.step(state, dummy_action)
+
+        for field, value in step.observation._asdict().items():
+            if field == 'action':
+                dummy_action = dummy_env.action_spec().generate_value()
+                chex.assert_trees_all_equal_shapes_and_dtypes(
+                    value, dummy_action
+                )
+                chex.assert_trees_all_equal(value, dummy_action)
+            else:
+                chex.assert_trees_all_equal_shapes_and_dtypes(
+                    value, getattr(reference, field)
+                )
+                chex.assert_trees_all_equal(value, getattr(reference, field))
+
+    @pytest.mark.usefixtures('dummy_env')
+    def test_spec(
+            self, dummy_env: jit_env.Environment
+    ):
+        wrapped = wrappers.ExtendObservation.pomdp_fields(dummy_env)
+
+        wrap_spec = wrapped.observation_spec()
+        _, step = dummy_env.reset(jax.random.key(0))
+
+        unflattened = specs.unpack_spec(wrap_spec)
+        for field, value in unflattened._asdict().items():  # type: ignore
+            dummy = value.generate_value()
+
+            if field == 'action':
+                chex.assert_trees_all_equal_shapes_and_dtypes(
+                    dummy, dummy_env.action_spec().generate_value()
+                )
+            else:
+                chex.assert_trees_all_equal_shapes_and_dtypes(
+                    dummy, getattr(step, field)
+                )
