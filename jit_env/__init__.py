@@ -11,7 +11,8 @@ from jit_env._core import (
     State as State,
     Observation as Observation,
     RewardT as Reward,
-    DiscountT as Discount
+    DiscountT as Discount,
+    EnvOptions
 )
 
 from jit_env import specs

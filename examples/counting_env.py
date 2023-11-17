@@ -42,7 +42,9 @@ class CountingEnv(
 
     def reset(
             self,
-            key: PRNGKeyArray
+            key: PRNGKeyArray,
+            *,
+            options=None
     ) -> tuple[MyState, jit_env.TimeStep]:
         state = MyState(key=key, count=jnp.zeros((), jnp.int32))
         return state, jit_env.restart(state.count, shape=())

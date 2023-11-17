@@ -88,10 +88,13 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
         def __init__(
                 self,
                 env: _core.Environment,
-                rng: _jax.random.KeyArray = _jax.random.PRNGKey(0)
+                rng: _jax.random.KeyArray = _jax.random.PRNGKey(0),
+                *,
+                options: _core.EnvOptions = None
         ):
             self.env = env
             self.rng = rng
+            self.options = options
 
             self._state = None
 
@@ -101,7 +104,7 @@ def make_deepmind_wrapper() -> None | tuple[type, _typing.Callable]:
 
         def reset(self) -> dm_env.TimeStep:
             self.rng, key = _jax.random.split(self.rng)
-            self._state, step = self.env.reset(key)
+            self._state, step = self.env.reset(key, options=self.options)
             return dm_env.restart(step.observation)
 
         def step(self, action) -> dm_env.TimeStep:
@@ -248,7 +251,7 @@ def make_gymnasium_wrapper() -> None | tuple[type, _typing.Callable]:
                 self._seed(seed)
 
             self.rng, reset_key = _jax.random.split(self.rng)
-            self.env_state, step = self.env.reset(reset_key)
+            self.env_state, step = self.env.reset(reset_key, options=options)
 
             return step.observation, (step.extras or {})
 
