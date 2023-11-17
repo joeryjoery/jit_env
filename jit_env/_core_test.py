@@ -29,7 +29,7 @@ def test_env_context(dummy_env: jit_env.Environment):
     )
 
     with env_cls() as my_env:
-        state, step = my_env.reset(jax.random.PRNGKey(0))
+        state, step = my_env.reset(jax.random.key(0))
         assert step.first()
 
         state, step = my_env.step(state, 0.0)
@@ -42,6 +42,8 @@ def test_env_context(dummy_env: jit_env.Environment):
     assert my_env.close_called
 
 
+# TODO: https://github.com/joeryjoery/jit_env/issues/30
+@pytest.mark.filterwarnings("ignore:divide by zero encountered in equal")
 @pytest.mark.usefixtures('dummy_env')
 def test_empty_wrapper(dummy_env: jit_env.Environment):
     wrapped: jit_env.Wrapper = jit_env.Wrapper(dummy_env)
@@ -60,8 +62,8 @@ def test_empty_wrapper(dummy_env: jit_env.Environment):
         spec_samples, wrap_samples
     )
 
-    out = dummy_env.reset(jax.random.PRNGKey(0))
-    wrap_out = wrapped.reset(jax.random.PRNGKey(0))
+    out = dummy_env.reset(jax.random.key(0))
+    wrap_out = wrapped.reset(jax.random.key(0))
 
     chex.assert_trees_all_equal(out, wrap_out)
     chex.assert_trees_all_equal_shapes_and_dtypes(

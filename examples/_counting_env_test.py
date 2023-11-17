@@ -11,7 +11,7 @@ def test_env_integration(max_value: int = 5):
 
     spec = jit_env.specs.make_environment_spec(env)
 
-    state, step = env.reset(jax.random.PRNGKey(0))
+    state, step = env.reset(jax.random.key(0))
 
     assert step.first()
     spec.observations.validate(step.observation)
